@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#16a34a">
+    <title>{% block title %}Splittchen - Simple Expense Splitting{% endblock %}</title>
+    
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            /* App colors - dark theme only */
+            --primary-green: #16a34a;
+            --primary-green-dark: #15803d;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            
+            --bg-body: #111827;
+            --bg-card: #1e293b;
+            --bg-hero: #111827;
+            --border-color: #334155;
+            
+            --icon-bg: #065f46;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .hero-section {
+            background-color: var(--bg-hero);
+            min-height: 40vh;
+            display: flex;
+            align-items: center;
+            padding: 2rem 0;
+        }
+        
+        .hero-title {
+            font-size: 3.2rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+        
+        .hero-title .text-green {
+            color: var(--primary-green);
+        }
+        
+        .hero-subtitle {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            transition: all 0.2s ease;
+        }
+        
+        .feature-card {
+            padding: 1.5rem;
+            text-align: center;
+            height: 100%;
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--icon-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+        
+        .feature-icon i {
+            font-size: 1.5rem;
+            color: var(--primary-green);
+        }
+        
+        .btn {
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 12px 32px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary-green {
+            background-color: var(--primary-green);
+            border-color: var(--primary-green);
+            color: white;
+        }
+        
+        .btn-primary-green:hover {
+            background-color: var(--primary-green-dark);
+            border-color: var(--primary-green-dark);
+            color: white;
+        }
+        
+        .btn-outline-secondary {
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+        }
+        
+        .btn-outline-secondary:hover {
+            background-color: var(--bg-card);
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+        }
+        
+        .participant-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            border: 2px solid var(--bg-card);
+        }
+        
+        /* Custom table styles */
+        .table {
+            --bs-table-bg: var(--bg-card);
+            --bs-table-color: var(--text-primary);
+            --bs-table-border-color: var(--border-color);
+        }
+        
+
+        
+        .table thead th {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .table-hover tbody tr:hover {
+            --bs-table-hover-bg: var(--bg-body);
+            --bs-table-hover-color: var(--text-primary);
+        }
+        
+        .participant-color-mini {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid var(--bg-card);
+        }
+        
+        .expense-card {
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .balance-positive {
+            color: #198754 !important; /* Bootstrap success green */
+            font-weight: 600;
+        }
+        
+        .balance-negative {
+            color: #dc3545 !important; /* Bootstrap danger red */
+            font-weight: 600;
+        }
+        
+        .balance-zero {
+            color: var(--text-muted);
+        }
+        
+        .navbar {
+            background-color: #0f172a !important;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 0;
+        }
+        
+        .navbar-brand {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--primary-green) !important;
+        }
+        
+        .text-primary {
+            color: var(--text-primary) !important;
+        }
+        
+        .text-secondary {
+            color: var(--text-secondary) !important;
+        }
+        
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+        
+        .form-control {
+            background-color: var(--bg-card);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 0.2rem rgba(22, 163, 74, 0.25);
+        }
+        
+
+        
+        .footer {
+            background-color: #0f172a;
+            color: var(--text-muted);
+            padding: 1.5rem 0;
+            margin-top: auto;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        /* Custom alert styling */
+        .alert-info {
+            background-color: rgba(22, 163, 74, 0.1);
+            border-color: rgba(22, 163, 74, 0.2);
+            color: var(--text-primary);
+        }
+        
+        .alert-warning {
+            background-color: rgba(22, 163, 74, 0.15);
+            border-color: rgba(22, 163, 74, 0.25);
+            color: var(--text-primary);
+        }
+        
+        .alert-success {
+            background-color: rgba(22, 163, 74, 0.1);
+            border-color: rgba(22, 163, 74, 0.2);
+            color: var(--text-primary);
+        }
+        
+        /* Common gradient header */
+        .card-header-gradient {
+            background: linear-gradient(135deg, var(--primary-green), var(--primary-green-dark));
+            color: white;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        /* Override Bootstrap default colors */
+        .btn-primary {
+            background-color: var(--primary-green) !important;
+            border-color: var(--primary-green) !important;
+            color: white !important;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-green-dark) !important;
+            border-color: var(--primary-green-dark) !important;
+            color: white !important;
+        }
+        
+        .btn-success {
+            background-color: var(--primary-green) !important;
+            border-color: var(--primary-green) !important;
+            color: white !important;
+        }
+        
+        .btn-success:hover {
+            background-color: var(--primary-green-dark) !important;
+            border-color: var(--primary-green-dark) !important;
+            color: white !important;
+        }
+        
+        .text-success, .text-primary {
+            color: var(--primary-green) !important;
+        }
+        
+        .text-info {
+            color: var(--primary-green) !important;
+        }
+        
+        .text-warning {
+            color: #f59e0b !important;
+        }
+        
+        .text-danger {
+            color: #dc2626 !important;
+        }
+        
+        /* Override Bootstrap background colors */
+        .bg-primary, .bg-success, .bg-info {
+            background: linear-gradient(135deg, var(--primary-green), var(--primary-green-dark)) !important;
+            color: white !important;
+        }
+        
+        .bg-warning {
+            background-color: #f59e0b !important;
+            color: white !important;
+        }
+        
+        .bg-danger {
+            background-color: #dc2626 !important;
+            color: white !important;
+        }
+        
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            /* Ensure proper container padding for mobile */
+            .container, .container-fluid {
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                max-width: 100% !important;
+            }
+            
+            /* Prevent horizontal overflow */
+            body {
+                overflow-x: hidden !important;
+            }
+            
+            /* Card margins for mobile - minimize spacing */
+            .card {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                max-width: 100% !important;
+                margin-bottom: 1rem !important;
+            }
+            
+            .card-body {
+                padding: 1rem !important;
+            }
+            
+            .card-header {
+                padding: 0.75rem 1rem !important;
+            }
+            
+            /* Navbar mobile adjustments - icons only */
+            .navbar .container {
+                padding-left: 1rem !important;
+                padding-right: 0.5rem !important;
+            }
+            
+            .navbar-brand {
+                margin-right: auto !important;
+                padding-left: 0.5rem !important;
+                font-weight: 600 !important;
+            }
+            
+            .navbar .d-flex {
+                gap: 0.5rem !important;
+                flex-wrap: nowrap !important;
+            }
+            
+            .navbar .btn {
+                width: 40px !important;
+                height: 40px !important;
+                min-height: 40px !important;
+                padding: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 8px !important;
+            }
+            
+            .navbar .btn i {
+                font-size: 1.1rem !important;
+                margin: 0 !important;
+            }
+            
+
+            
+            .navbar .btn span {
+                display: none !important;
+            }
+            
+            .navbar .btn .me-1 {
+                margin-right: 0 !important;
+            }
+            /* Uniform touch targets - all buttons same height for app-like feel */
+            .btn, .btn-lg, .btn-sm {
+                min-height: 48px !important;
+                height: 48px !important;
+                padding: 0 0.75rem !important;
+                font-size: 0.9rem !important;
+                font-weight: 500 !important;
+                border-radius: 12px !important;
+                transition: all 0.2s ease !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+                line-height: 1.2 !important;
+                word-break: break-word !important;
+                hyphens: auto !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Ensure button groups are properly aligned */
+            .d-flex .btn {
+                vertical-align: top !important;
+                margin: 0 !important;
+            }
+            
+            /* Hero section button alignment */
+            .hero-section .d-flex .btn {
+                flex-shrink: 0 !important;
+                align-self: center !important;
+            }
+            
+            /* Recent groups desktop layout - restore original horizontal layout */
+            @media (min-width: 769px) {
+                .recent-group-header {
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 0.5rem !important;
+                    margin-bottom: 0.5rem !important;
+                }
+                
+                .recent-group-name {
+                    margin-right: 0.5rem !important;
+                }
+                
+                .recent-group-badges {
+                    display: inline-flex !important;
+                    gap: 0.25rem !important;
+                    margin-bottom: 0 !important;
+                }
+                
+                .recent-group-badges .badge {
+                    margin-left: 0.25rem;
+                }
+                
+                .recent-group-stats {
+                    display: flex !important;
+                    gap: 0 !important;
+                }
+                
+                .recent-group-stats span {
+                    margin-right: 0 !important;
+                }
+                
+                .recent-group-stats span:not(:last-child)::after {
+                    content: " • ";
+                    opacity: 0.6;
+                }
+            }
+            
+            /* Recent groups mobile optimization - compact layout (mobile only) */
+            @media (max-width: 768px) {
+                .recent-group-item {
+                    display: flex !important;
+                    justify-content: space-between !important;
+                    align-items: flex-start !important;
+                    padding: 0.75rem 1rem !important;
+                    gap: 0.75rem !important;
+                }
+                
+                .recent-group-content {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 0.5rem !important;
+                }
+                
+                /* Group name row */
+                .recent-group-header {
+                    display: flex !important;
+                    align-items: center !important;
+                    margin-bottom: 0 !important;
+                }
+                
+                .recent-group-name {
+                    margin: 0 !important;
+                    font-size: 1rem !important;
+                    font-weight: 600 !important;
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                }
+                
+                /* Badges row - wrap to new line if too many */
+                .recent-group-badges {
+                    display: flex !important;
+                    flex-wrap: wrap !important;
+                    gap: 0.25rem !important;
+                    margin-bottom: 0 !important;
+                }
+                
+                .recent-group-badges .badge {
+                    font-size: 0.7rem !important;
+                    padding: 0.25rem 0.4rem !important;
+                    white-space: nowrap !important;
+                    margin-left: 0 !important;
+                }
+                
+                /* Stats row */
+                .recent-group-stats {
+                    display: flex !important;
+                    flex-wrap: wrap !important;
+                    gap: 0.5rem !important;
+                    font-size: 0.75rem !important;
+                    color: var(--text-muted) !important;
+                }
+                
+                .recent-group-stats i {
+                    margin-right: 0.25rem !important;
+                }
+                
+                .recent-group-stats span {
+                    white-space: nowrap !important;
+                }
+                
+                .recent-group-stats span::after {
+                    display: none !important;
+                }
+                
+                /* Buttons - always visible and accessible */
+                .recent-group-actions {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 0.4rem !important;
+                    flex-shrink: 0 !important;
+                    align-self: flex-start !important;
+                }
+                
+                .recent-group-open,
+                .recent-group-admin {
+                    width: 44px !important;
+                    height: 44px !important;
+                    min-width: 44px !important;
+                    min-height: 44px !important;
+                    max-width: 44px !important;
+                    max-height: 44px !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    border-radius: 10px !important;
+                    font-size: 1rem !important;
+                    line-height: 1 !important;
+                    box-sizing: border-box !important;
+                    aspect-ratio: 1 / 1 !important;
+                }
+                
+                .recent-group-open .btn-text {
+                    display: none !important;
+                }
+                
+                .recent-group-open i {
+                    margin: 0 !important;
+                }
+            }
+            
+            /* Group view mobile optimizations */
+            @media (max-width: 768px) {
+                /* Tabs - fit to container width, no scrolling */
+                .nav-tabs {
+                    display: flex !important;
+                    width: 100% !important;
+                    overflow: visible !important;
+                }
+                
+                .nav-tabs .nav-item {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                }
+                
+                .nav-tabs .nav-link {
+                    padding: 0.5rem 0.25rem !important;
+                    font-size: 0.75rem !important;
+                    text-align: center !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                }
+                
+                /* Hide icons in nav tabs on mobile */
+                .nav-tabs .nav-link .bi {
+                    display: none !important;
+                }
+                
+                /* Group name card - fix badge layout and spacing */
+                .card-body .d-flex.flex-wrap {
+                    display: flex !important;
+                    flex-wrap: wrap !important;
+                    gap: 0.5rem !important;
+                    align-items: center !important;
+                }
+                
+                .card-body .badge {
+                    flex-shrink: 0 !important;
+                    white-space: nowrap !important;
+                    margin: 0 !important;
+                }
+                
+                /* Complete mobile expense table restructure */
+                #expenses-tab .table-responsive {
+                    overflow-x: hidden !important;
+                }
+                
+                /* Mobile expense rows - proper container */
+                /* Hide admin options in balance section on mobile - redundant with header buttons */
+                #balances-tab .alert.alert-info {
+                    display: none !important;
+                }
+                
+                #balances-tab .alert.alert-warning {
+                    display: none !important;
+                }
+                
+                #balances-tab .admin-actions {
+                    display: none !important;
+                }
+                
+                #balances-tab .d-flex.gap-2.flex-wrap.admin-actions {
+                    display: none !important;
+                }
+                
+                /* Participants - convert table to list on mobile */
+                #participants-tab .table-responsive {
+                    display: none !important;
+                }
+                
+                /* Create mobile participants list */
+                #participants-tab .participants-mobile-list {
+                    display: block !important;
+                }
+                
+                .participant-mobile-item {
+                    display: flex !important;
+                    justify-content: space-between !important;
+                    align-items: center !important;
+                    padding: 1rem !important;
+                    border-bottom: 1px solid var(--bs-border-color) !important;
+                }
+                
+                .participant-mobile-item:last-child {
+                    border-bottom: none !important;
+                }
+                
+                .participant-mobile-info {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                }
+                
+                .participant-mobile-name {
+                    display: flex !important;
+                    align-items: center !important;
+                    margin-bottom: 0.25rem !important;
+                }
+                
+                .participant-mobile-details {
+                    font-size: 0.875rem !important;
+                    color: var(--bs-text-muted) !important;
+                }
+                
+                .participant-mobile-actions {
+                    flex-shrink: 0 !important;
+                }
+                
+                /* History download button - green icon only, navbar size */
+                .card-header .btn-outline-primary.btn-sm {
+                    padding: 0 !important;
+                    min-height: 44px !important;
+                    width: 44px !important;
+                    border-color: var(--primary-green) !important;
+                    color: var(--primary-green) !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                }
+                
+                .card-header .btn-outline-primary.btn-sm:hover {
+                    background-color: var(--primary-green) !important;
+                    border-color: var(--primary-green) !important;
+                    color: white !important;
+                }
+                
+                /* Hide text in download button - only keep icon */
+                .card-header .btn-outline-primary.btn-sm {
+                    font-size: 0 !important;
+                }
+                
+                .card-header .btn-outline-primary.btn-sm .bi-download {
+                    font-size: 1rem !important;
+                    margin: 0 !important;
+                }
+                
+                /* Group header buttons - bigger squares on mobile */
+                .card-body .d-flex.gap-1 .btn,
+                .card-body .d-flex.justify-content-md-end .btn {
+                    height: 36px !important;
+                    width: 36px !important;
+                    min-height: 36px !important;
+                    min-width: 36px !important;
+                    padding: 0 !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    border-radius: 4px !important;
+                    font-size: 0 !important;
+                    border-width: 1px !important;
+                    flex-shrink: 0 !important;
+                }
+                
+                /* Show only icons in group header buttons */
+                .card-body .d-flex.gap-1 .btn .bi,
+                .card-body .d-flex.justify-content-md-end .btn .bi {
+                    font-size: 1rem !important;
+                    margin: 0 !important;
+                }
+                
+                /* Currency selector mobile styling */
+                .card-body .form-select.form-select-sm {
+                    height: 36px !important;
+                    min-height: 36px !important;
+                    padding: 0.25rem 0.5rem !important;
+                    font-size: 0.75rem !important;
+                    border-radius: 4px !important;
+                    margin-right: 0.5rem !important;
+                }
+                
+                /* Group card layout - match spacing between sections */
+                .card-body .row.align-items-center .col-md-6:first-child > div:not(:last-child) {
+                    margin-bottom: 0.5rem !important;
+                }
+                
+                /* Ensure button row has proper spacing from badges */
+                .card-body .d-flex.justify-content-md-end {
+                    align-items: flex-end !important;
+                    height: 100% !important;
+                    margin-top: 0.5rem !important;
+                }
+                
+                /* Hide currency label text on mobile */
+                .card-body .d-flex.align-items-center .text-muted {
+                    display: none !important;
+                }
+            }
+            
+
+            
+            /* Icon-only buttons (smaller but consistent) */
+            .btn-icon {
+                min-height: 44px !important;
+                width: 44px !important;
+                padding: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 12px !important;
+            }
+            
+            /* Small action buttons in tables */
+            .btn-table-action {
+                min-height: 40px !important;
+                width: 40px !important;
+                padding: 0 !important;
+                font-size: 0.875rem !important;
+                border-radius: 10px !important;
+            }
+            
+            /* Better form inputs */
+            .form-control, .form-select {
+                min-height: 44px;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            /* Improve table readability */
+            .table {
+                font-size: 0.9rem;
+            }
+            
+            .table td, .table th {
+                padding: 0.75rem 0.5rem;
+                white-space: nowrap;
+            }
+            
+            /* Stack buttons vertically on mobile with better spacing */
+            .btn-group-mobile {
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+                width: 100%;
+            }
+            
+            .btn-group-mobile .btn {
+                width: 100% !important;
+                margin-bottom: 0 !important;
+                flex-shrink: 0 !important;
+            }
+            
+            /* Horizontal button groups - ensure they fit on mobile */
+            .btn-group-horizontal {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: nowrap;
+                width: 100%;
+                max-width: 100%;
+                overflow: hidden;
+            }
+            
+            .btn-group-horizontal .btn {
+                flex: 1 1 0px !important;
+                min-width: 0 !important;
+                max-width: calc(50% - 0.25rem) !important;
+                font-size: 0.8rem !important;
+                padding: 0 0.5rem !important;
+            }
+            
+            /* Action button rows in tables/cards */
+            .action-buttons {
+                display: flex;
+                gap: 0.5rem;
+                justify-content: flex-end;
+                flex-wrap: wrap;
+            }
+            
+            /* Improve modal dialogs */
+            .modal-dialog {
+                margin: 0.5rem;
+                max-width: calc(100% - 1rem);
+            }
+            
+            .modal-body {
+                padding: 1rem;
+            }
+            
+            /* Better spacing for cards */
+            .card {
+                margin-bottom: 1rem;
+            }
+            
+            /* Improve tab navigation */
+            .nav-tabs .nav-link {
+                padding: 0.75rem 0.5rem;
+                font-size: 0.9rem;
+            }
+            
+            /* Stack admin buttons */
+            .admin-actions {
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+            
+            .admin-actions .btn {
+                width: 100%;
+            }
+            
+            /* Better breadcrumb */
+            .breadcrumb {
+                font-size: 0.9rem;
+                padding: 0.5rem 0;
+                margin-bottom: 1rem;
+            }
+            
+            /* Improve currency selector */
+            .currency-selector {
+                margin-bottom: 1rem;
+            }
+            
+            /* Better balance display */
+            .balance-item {
+                padding: 1rem 0.5rem !important;
+                border-bottom: 1px solid var(--border-color) !important;
+            }
+            
+            .balance-item:last-child {
+                border-bottom: none !important;
+            }
+            
+            /* Improve expense cards */
+
+            /* Admin panel mobile optimizations */
+            .participants-table {
+                margin-bottom: 0 !important;
+            }
+
+            .participant-name-cell {
+                min-width: 120px !important;
+                padding: 0.75rem 0.5rem !important;
+            }
+
+            .participant-mobile-info {
+                margin-top: 0.25rem !important;
+                line-height: 1.3 !important;
+            }
+
+            .participant-actions {
+                display: flex !important;
+                gap: 0.25rem !important;
+                justify-content: flex-end !important;
+                flex-wrap: nowrap !important;
+            }
+
+            .participant-actions .btn {
+                min-width: 36px !important;
+                width: 36px !important;
+                height: 36px !important;
+                padding: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 6px !important;
+                font-size: 0.9rem !important;
+            }
+
+            /* Ensure no horizontal scrolling */
+            .table-responsive {
+                overflow-x: visible !important;
+            }
+
+            /* Footer mobile optimizations - keep links on one line */
+            .footer p {
+                white-space: nowrap !important;
+                overflow: hidden !important;
+            }
+
+            .footer .small {
+                font-size: 0.7rem !important;
+            }
+
+            .footer .mx-2 {
+                margin-left: 0.5rem !important;
+                margin-right: 0.5rem !important;
+            }
+
+            /* Participant list mobile optimizations - match expense list styling */
+
+            /* Make ONLY icon-only action buttons square (edit/delete in expenses and participants) */
+            .edit-participant-btn,
+            .remove-participant-btn,
+            .edit-expense-btn,
+            .delete-expense-btn {
+                width: 36px !important;
+                height: 36px !important;
+                min-width: 36px !important;
+                min-height: 36px !important;
+                padding: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 8px !important;
+                font-size: 0.9rem !important;
+                line-height: 1 !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Button spacing for action buttons */
+            .edit-participant-btn,
+            .edit-expense-btn,
+            .delete-expense-btn:not(:last-child) {
+                margin-right: 0.25rem !important;
+            }
+
+            /* Force action buttons to stay on same line */
+            .card-body .text-end {
+                white-space: nowrap !important;
+                align-self: center !important;
+            }
+
+            /* Desktop button spacing for expense and participant tables */
+            .btn-group .btn:not(:last-child) {
+                margin-right: 0.25rem !important;
+            }
+        }
+        
+        /* Extra small devices */
+        @media (max-width: 576px) {
+            .container {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            
+            /* Tighter spacing for very small screens */
+            .card {
+                margin-bottom: 0.75rem !important;
+                border-radius: 0.5rem;
+                margin-left: 0;
+                margin-right: -0.25rem;
+            }
+            
+            /* Hide less important columns on very small screens */
+            .table .d-none-xs {
+                display: none !important;
+            }
+            
+            /* Make forms full width */
+            .modal-dialog {
+                margin: 0.25rem;
+                max-width: calc(100% - 0.5rem);
+            }
+            
+            /* Smaller text for tables */
+            .table {
+                font-size: 0.8rem;
+            }
+            
+            /* Better button spacing */
+            .btn + .btn {
+                margin-top: 0.5rem;
+            }
+        }
+    </style>
+    
+
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+                splittchen
+            </a>
+            
+            <div class="d-flex align-items-center gap-3">
+                <a href="{{ url_for('main.create_group') }}" class="btn btn-primary-green">
+                    <i class="bi bi-plus-circle me-1"></i><span>Create</span>
+                </a>
+                <a href="{{ url_for('main.join_group') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-box-arrow-in-right me-1"></i><span>Join</span>
+                </a>
+                <a href="{{ url_for('main.find_groups') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-search me-1"></i><span>Find</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container text-center">
+            <p class="mb-1">© 2025 Splittchen. Made with ❤️</p>
+            <p class="mb-0 small">
+                <a href="https://github.com/splittchen/splittchen" target="_blank" rel="noopener noreferrer" class="text-decoration-none" style="color: var(--text-muted);">
+                    <i class="bi bi-github me-1"></i>View on GitHub
+                </a>
+                <span class="mx-2">•</span>
+                <a href="https://github.com/splittchen/splittchen/issues" target="_blank" rel="noopener noreferrer" class="text-decoration-none" style="color: var(--text-muted);">
+                    <i class="bi bi-bug me-1"></i>Report Issue
+                </a>
+                <span class="mx-2">•</span>
+                <a href="https://github.com/splittchen/splittchen/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="text-decoration-none" style="color: var(--text-muted);">
+                    <i class="bi bi-file-text me-1"></i>License
+                </a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Socket.IO Client for real-time updates -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <!-- Real-Time WebSocket Connection -->
+    <script>
+        // Splittchen Real-Time Connection Manager
+        class SplittchenRealtime {
+            constructor() {
+                this.socket = null;
+                this.groupToken = null;
+                this.isAdmin = false;
+                this.connectionStatus = 'disconnected';
+                this.notifications = new SplittchenNotifications();
+                this.isGroupPage = window.location.pathname.includes('/group/') || window.location.pathname.includes('/admin/');
+            }
+            
+            // Initialize WebSocket connection for group pages
+            init(groupToken = null, isAdmin = false) {
+                if (!this.isGroupPage) return;
+                
+                this.groupToken = groupToken;
+                this.isAdmin = isAdmin;
+                
+                // Initialize Socket.IO connection
+                this.socket = io({
+                    transports: ['websocket', 'polling'], // Allow fallback to polling
+                    upgrade: true,
+                    rememberUpgrade: true
+                });
+                
+                this.setupEventHandlers();
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    console.log('Splittchen real-time connection initialized');
+                }
+            }
+            
+            setupEventHandlers() {
+                // Connection events
+                this.socket.on('connect', () => {
+                    this.connectionStatus = 'connected';
+                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                        console.log('Connected to Splittchen real-time updates');
+                    }
+                    
+                    // Join group room if we have a token
+                    if (this.groupToken) {
+                        this.joinGroup(this.groupToken);
+                    }
+                    
+                    this.showConnectionStatus('Connected', 'success');
+                });
+                
+                this.socket.on('disconnect', (reason) => {
+                    this.connectionStatus = 'disconnected';
+                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                        console.log('Disconnected from real-time updates:', reason);
+                    }
+                    this.showConnectionStatus('Disconnected', 'warning');
+                });
+                
+                this.socket.on('connect_error', (error) => {
+                    console.error('Connection error:', error);
+                    this.showConnectionStatus('Connection Error', 'danger');
+                });
+                
+                // Group events
+                this.socket.on('group_joined', (data) => {
+                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                        console.log('Joined group room:', data.room);
+                    }
+                    this.showConnectionStatus(`Connected to ${data.group.name}`, 'success');
+                });
+                
+                // Real-time update events
+                this.socket.on('expense_update', (data) => this.handleExpenseUpdate(data));
+                this.socket.on('participant_update', (data) => this.handleParticipantUpdate(data));
+                this.socket.on('balance_update', (data) => this.handleBalanceUpdate(data));
+                this.socket.on('admin_action', (data) => this.handleAdminAction(data));
+                this.socket.on('notification', (data) => this.handleNotification(data));
+                
+                // Error handling
+                this.socket.on('error', (data) => {
+                    console.error('WebSocket error:', data);
+                });
+            }
+            
+            joinGroup(shareToken) {
+                if (!this.socket || !shareToken) return;
+                
+                this.socket.emit('join_group', {
+                    share_token: shareToken
+                });
+            }
+            
+            leaveGroup(shareToken) {
+                if (!this.socket || !shareToken) return;
+                
+                this.socket.emit('leave_group', {
+                    share_token: shareToken
+                });
+            }
+            
+            // Handle real-time expense updates
+            handleExpenseUpdate(data) {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    console.log('Expense update:', data);
+                }
+                
+                switch(data.type) {
+                    case 'expense_added':
+                        this.showUpdateNotification(data.message, 'success');
+                        this.addExpenseToDOM(data.expense);
+                        this.updateExpenseCount();
+                        break;
+                    case 'expense_updated':
+                        this.showUpdateNotification(data.message, 'info');
+                        this.updateExpenseInDOM(data.expense);
+                        break;
+                    case 'expense_deleted':
+                        this.showUpdateNotification(data.message, 'warning');
+                        this.removeExpenseFromDOM(data.expense.id);
+                        this.updateExpenseCount();
+                        break;
+                }
+                
+                // Send browser notification if tab is not visible
+                if (document.hidden) {
+                    this.notifications.show({
+                        title: 'Expense Update',
+                        body: data.message,
+                        tag: `expense_${data.expense?.id || Date.now()}`
+                    });
+                }
+            }
+            
+            // Handle participant updates  
+            handleParticipantUpdate(data) {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    console.log('Participant update:', data);
+                }
+                this.showUpdateNotification(data.message, 'info');
+                
+                switch(data.type) {
+                    case 'participant_added':
+                    case 'participant_joined':
+                        this.addParticipantToDOM(data.participant);
+                        this.updateMemberCount();
+                        break;
+                    case 'participant_removed':
+                        // Handle participant_id for removal (not nested in participant object)
+                        this.removeParticipantFromDOM(data.participant_id);
+                        this.updateMemberCount();
+                        break;
+                    case 'participant_updated':
+                        this.updateParticipantInDOM(data.participant);
+                        break;
+                }
+                
+                if (document.hidden) {
+                    this.notifications.show({
+                        title: 'Group Update',
+                        body: data.message,
+                        tag: `participant_${data.participant?.id || data.participant_id || Date.now()}`
+                    });
+                }
+            }
+            
+            // Handle balance updates
+            handleBalanceUpdate(data) {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    console.log('Balance update:', data);
+                }
+                // Update all balances in real-time
+                this.updateBalancesInDOM(data.balances);
+            }
+            
+            // Handle admin actions
+            handleAdminAction(data) {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    console.log('Admin action:', data);
+                }
+                this.showUpdateNotification(data.message, 'primary');
+                
+                // For major admin actions, we might need to reload
+                // but for minor updates, handle them in real-time
+                switch(data.type) {
+                    case 'group_settled':
+                    case 'group_reopened': 
+                    case 'group_deleted':
+                        // Major changes - need page reload
+                        this.schedulePageReload();
+                        break;
+                    default:
+                        // Minor admin updates can be handled in real-time
+                        break;
+                }
+                
+                // Admin actions are important - always notify
+                this.notifications.show({
+                    title: 'Group Admin Action',
+                    body: data.message,
+                    tag: `admin_${Date.now()}`,
+                    requireInteraction: true
+                });
+            }
+            
+            // Handle notification events
+            handleNotification(data) {
+                if (data.notification) {
+                    this.notifications.show(data.notification);
+                }
+            }
+            
+            // Schedule a page update (debounced to avoid excessive updates)
+            schedulePageUpdate() {
+                if (this.updateTimeout) {
+                    clearTimeout(this.updateTimeout);
+                }
+                
+                // Wait 2 seconds before updating to batch multiple changes
+                this.updateTimeout = setTimeout(() => {
+                    if (!document.querySelector('.modal.show')) { // Don't update if modal is open
+                        // Save current tab before reload
+                        const activeTab = document.querySelector('.nav-link.active, .mobile-nav-btn.active');
+                        if (activeTab) {
+                            const tabTarget = activeTab.getAttribute('data-bs-target');
+                            localStorage.setItem('activeTab', tabTarget);
+                        }
+                        
+                        window.location.reload();
+                    }
+                }, 2000);
+            }
+            
+            // Show connection status
+            showConnectionStatus(message, type = 'info') {
+                // Create or update connection status indicator
+                let indicator = document.getElementById('connection-status');
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.id = 'connection-status';
+                    indicator.className = 'position-fixed top-0 end-0 m-3';
+                    indicator.style.zIndex = '9999';
+                    document.body.appendChild(indicator);
+                }
+                
+                indicator.innerHTML = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert" style="min-width: 200px;">
+                        <i class="bi bi-wifi me-2"></i>${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                
+                // Auto-hide success messages
+                if (type === 'success') {
+                    setTimeout(() => {
+                        const alert = indicator.querySelector('.alert');
+                        if (alert) {
+                            alert.classList.remove('show');
+                            setTimeout(() => indicator.innerHTML = '', 150);
+                        }
+                    }, 3000);
+                }
+            }
+            
+            // Show update notification
+            showUpdateNotification(message, type = 'info') {
+                // Only show if user might be interested (not too spammy)
+                if (document.hidden) return; // Will be handled by browser notification
+                
+                this.showConnectionStatus(message, type);
+            }
+            
+            // === Phase 2: Real-time DOM Update Methods ===
+            
+            // Add new expense to the DOM
+            addExpenseToDOM(expense) {
+                const expenseTableBody = document.querySelector('#expenses-tab tbody');
+                if (!expenseTableBody) return;
+                
+                const expenseRow = this.createExpenseRow(expense);
+                expenseTableBody.insertBefore(expenseRow, expenseTableBody.firstChild);
+                
+                // Add highlight animation
+                expenseRow.classList.add('table-success');
+                setTimeout(() => expenseRow.classList.remove('table-success'), 2000);
+            }
+            
+            // Update existing expense in DOM
+            updateExpenseInDOM(expense) {
+                const existingRow = document.querySelector(`tr[data-expense-id="${expense.id}"]`);
+                if (existingRow) {
+                    const newRow = this.createExpenseRow(expense);
+                    existingRow.replaceWith(newRow);
+                    newRow.classList.add('table-warning');
+                    setTimeout(() => newRow.classList.remove('table-warning'), 2000);
+                }
+            }
+            
+            // Remove expense from DOM
+            removeExpenseFromDOM(expenseId) {
+                const expenseRow = document.querySelector(`tr[data-expense-id="${expenseId}"]`);
+                if (expenseRow) {
+                    expenseRow.classList.add('table-danger');
+                    setTimeout(() => expenseRow.remove(), 1000);
+                }
+            }
+            
+            // Create expense row HTML
+            createExpenseRow(expense) {
+                const row = document.createElement('tr');
+                row.className = 'expense-row';
+                row.setAttribute('data-expense-id', expense.id);
+                
+                // Format date
+                const expenseDate = new Date(expense.date).toLocaleDateString();
+                
+                row.innerHTML = `
+                    <td>
+                        <div class="fw-semibold">${expense.title}</div>
+                        ${expense.description ? `<small class="text-muted d-block">${expense.description}</small>` : ''}
+                        <div class="d-flex align-items-center gap-1 mt-1">
+                            <span class="badge bg-secondary small">${expense.category}</span>
+                            <small class="text-muted">Split ${expense.split_type.toLowerCase()}</small>
+                        </div>
+                    </td>
+                    <td class="text-end">
+                        <div class="fw-bold">${this.formatCurrency(expense.amount, expense.currency)}</div>
+                        <small class="text-muted d-block">${expenseDate}</small>
+                    </td>
+                    <td class="text-center">
+                        <span class="participant-color" data-color="${expense.paid_by.color}"></span>
+                        ${expense.paid_by.name}
+                    </td>
+                `;
+                
+                return row;
+            }
+            
+            // Add participant to DOM
+            addParticipantToDOM(participant) {
+                const participantsContainer = document.querySelector('#participants-tab .card-body');
+                if (!participantsContainer) return;
+
+                const participantItem = this.createParticipantItem(participant);
+                participantsContainer.appendChild(participantItem);
+
+                // Add to balances as well (with 0 balance)
+                this.addParticipantToBalances(participant);
+
+                // Update member count in header
+                this.updateMemberCount();
+            }
+            
+            // Remove participant from DOM
+            removeParticipantFromDOM(participantId) {
+                const participantItem = document.querySelector(`[data-participant-id="${participantId}"]`);
+                if (participantItem) {
+                    participantItem.remove();
+                }
+                
+                // Remove from balances too
+                const balanceItem = document.querySelector(`[data-balance-participant-id="${participantId}"]`);
+                if (balanceItem) {
+                    balanceItem.remove();
+                }
+            }
+            
+            // Update participant in DOM
+            updateParticipantInDOM(participant) {
+                // Update participant in table view
+                const tableRow = document.querySelector(`tr:has([data-participant-id="${participant.id}"])`);
+                if (tableRow) {
+                    const nameCell = tableRow.querySelector('.fw-semibold');
+                    if (nameCell) nameCell.textContent = participant.name;
+                    
+                    const emailCell = nameCell ? nameCell.closest('td').nextElementSibling : null;
+                    if (emailCell) {
+                        const emailSpan = emailCell.querySelector('span');
+                        if (emailSpan) {
+                            if (participant.email) {
+                                emailSpan.textContent = participant.email;
+                                emailSpan.className = 'text-muted';
+                            } else {
+                                emailSpan.textContent = 'No email';
+                                emailSpan.className = 'text-muted fst-italic';
+                            }
+                        }
+                    }
+                }
+                
+                // Update participant in mobile card view
+                const mobileCard = document.querySelector(`.d-md-none .card[data-participant-id="${participant.id}"] .fw-semibold`);
+                if (mobileCard) {
+                    mobileCard.textContent = participant.name;
+                    const cardBody = mobileCard.closest('.card-body');
+                    const emailElement = cardBody.querySelector('small.text-muted');
+                    if (emailElement && !emailElement.textContent.startsWith('Joined')) {
+                        if (participant.email) {
+                            emailElement.textContent = participant.email;
+                            emailElement.className = 'text-muted d-block';
+                        } else {
+                            emailElement.textContent = 'No email';
+                            emailElement.className = 'text-muted fst-italic d-block';
+                        }
+                    }
+                }
+                
+                // Update button data attributes for both desktop and mobile
+                const editButtons = document.querySelectorAll(`.edit-participant-btn[data-participant-id="${participant.id}"]`);
+                editButtons.forEach(button => {
+                    button.setAttribute('data-participant-name', participant.name);
+                    button.setAttribute('data-participant-email', participant.email || '');
+                });
+                
+                const removeButtons = document.querySelectorAll(`.remove-participant-btn[data-participant-id="${participant.id}"]`);
+                removeButtons.forEach(button => {
+                    button.setAttribute('data-participant-name', participant.name);
+                });
+            }
+            
+            // Create participant item HTML
+            createParticipantItem(participant) {
+                const item = document.createElement('div');
+                item.className = 'd-flex justify-content-between align-items-start mb-3 pb-3 border-bottom';
+                item.setAttribute('data-participant-id', participant.id);
+
+                const joinedDate = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                item.innerHTML = `
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="participant-color me-2" data-color="${participant.color}"></span>
+                            <span class="fw-semibold">${participant.name}</span>
+                        </div>
+                        ${participant.email ?
+                            `<small class="text-muted d-block">${participant.email}</small>` :
+                            `<small class="text-muted fst-italic d-block">No email</small>`
+                        }
+                        <small class="text-muted">Joined ${joinedDate}</small>
+                    </div>
+                `;
+
+                return item;
+            }
+            
+            // Update balances in DOM
+            updateBalancesInDOM(balances) {
+                Object.entries(balances).forEach(([participantId, balance]) => {
+                    const balanceElement = document.querySelector(`[data-balance-participant-id="${participantId}"] .fw-bold`);
+                    if (balanceElement) {
+                        // Update balance value
+                        balanceElement.textContent = this.formatCurrency(balance.amount, balance.currency);
+                        
+                        // Update balance color class
+                        balanceElement.className = 'fw-bold ' + this.getBalanceClass(balance.amount);
+                        
+                        // Add update animation
+                        const balanceItem = balanceElement.closest('.balance-item');
+                        if (balanceItem) {
+                            balanceItem.classList.add('table-info');
+                            setTimeout(() => balanceItem.classList.remove('table-info'), 1500);
+                        }
+                    }
+                });
+            }
+            
+            // Add participant to balances section
+            addParticipantToBalances(participant) {
+                const balancesContainer = document.querySelector('#balances-tab .border-bottom').parentNode;
+                if (!balancesContainer) return;
+                
+                const balanceItem = document.createElement('div');
+                balanceItem.className = 'd-flex justify-content-between align-items-center py-2 border-bottom balance-item';
+                balanceItem.setAttribute('data-balance-participant-id', participant.id);
+                
+                balanceItem.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <span class="participant-color" data-color="${participant.color}"></span>
+                        <span>${participant.name}</span>
+                    </div>
+                    <span class="fw-bold balance-zero">€0.00</span>
+                `;
+                
+                balancesContainer.appendChild(balanceItem);
+            }
+            
+            // Update expense count in header
+            updateExpenseCount() {
+                const expenseCountElement = document.querySelector('#expenses-tab .card-header h5');
+                if (expenseCountElement) {
+                    const expenseRows = document.querySelectorAll('#expenses-tab tbody tr').length;
+                    expenseCountElement.innerHTML = `<i class="bi bi-receipt me-2"></i>Expenses (${expenseRows})`;
+                }
+            }
+            
+            // Update member count in header
+            updateMemberCount() {
+                // Update count in participants tab header
+                const participantHeader = document.querySelector('#participants-tab .card-header h5');
+                if (participantHeader) {
+                    const participantCount = document.querySelectorAll('#participants-tab .card-body [data-participant-id]').length;
+                    participantHeader.innerHTML = `<i class="bi bi-people me-2"></i>Participants (${participantCount})`;
+                }
+
+                // Update member badge if it exists
+                const memberBadge = document.querySelector('.badge.bg-secondary');
+                if (memberBadge) {
+                    const participantItems = document.querySelectorAll('#participants-tab .card-body [data-participant-id]').length;
+                    memberBadge.innerHTML = `<i class="bi bi-people me-1"></i>${participantItems} member${participantItems !== 1 ? 's' : ''}`;
+                }
+            }
+            
+            // Helper methods
+            formatCurrency(amount, currency = 'EUR') {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: currency
+                }).format(amount);
+            }
+            
+            getBalanceClass(amount) {
+                if (amount > 0) return 'balance-positive';
+                if (amount < 0) return 'balance-negative';
+                return 'balance-zero';
+            }
+            
+            // Fallback for major changes that still need page reload
+            schedulePageReload() {
+                if (this.reloadTimeout) {
+                    clearTimeout(this.reloadTimeout);
+                }
+                
+                this.reloadTimeout = setTimeout(() => {
+                    if (!document.querySelector('.modal.show')) {
+                        const activeTab = document.querySelector('.nav-link.active, .mobile-nav-btn.active');
+                        if (activeTab) {
+                            const tabTarget = activeTab.getAttribute('data-bs-target');
+                            localStorage.setItem('activeTab', tabTarget);
+                        }
+                        window.location.reload();
+                    }
+                }, 2000);
+            }
+        }
+        
+        // Browser Notifications Manager
+        class SplittchenNotifications {
+            constructor() {
+                this.permission = 'default';
+                this.requestPermission();
+            }
+            
+            async requestPermission() {
+                if (!('Notification' in window)) {
+                    console.warn('Browser does not support notifications');
+                    return;
+                }
+                
+                if (Notification.permission === 'granted') {
+                    this.permission = 'granted';
+                } else if (Notification.permission !== 'denied') {
+                    // Don't auto-request - wait for user interaction
+                    this.permission = 'default';
+                }
+            }
+            
+            async requestPermissionOnInteraction() {
+                if (this.permission === 'granted') return true;
+                
+                try {
+                    const permission = await Notification.requestPermission();
+                    this.permission = permission;
+                    return permission === 'granted';
+                } catch (error) {
+                    console.error('Error requesting notification permission:', error);
+                    return false;
+                }
+            }
+            
+            show(options) {
+                if (this.permission !== 'granted') return;
+                
+                const notification = new Notification(options.title || 'Splittchen', {
+                    body: options.body || '',
+                    icon: options.icon || '/static/favicon-32x32.png',
+                    badge: options.badge || '/static/favicon-32x32.png',
+                    tag: options.tag || 'splittchen-update',
+                    requireInteraction: options.requireInteraction || false,
+                    silent: options.silent || false
+                });
+                
+                // Handle click to focus window/tab
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                    
+                    // Handle action if provided
+                    if (options.action) {
+                        this.handleNotificationAction(options.action);
+                    }
+                };
+                
+                // Auto-close after 5 seconds unless requireInteraction is true
+                if (!options.requireInteraction) {
+                    setTimeout(() => notification.close(), 5000);
+                }
+            }
+            
+            handleNotificationAction(action) {
+                if (action.type === 'open_group' && action.share_token) {
+                    // Navigate to group with specific tab
+                    const url = `/group/${action.share_token}${action.tab ? `?tab=${action.tab}` : ''}`;
+                    if (window.location.pathname !== `/group/${action.share_token}`) {
+                        window.location.href = url;
+                    }
+                }
+            }
+        }
+        
+        // Global real-time connection instance
+        window.splittchenRealtime = new SplittchenRealtime();
+        
+        // PWA Install Prompt Manager
+        class SplittchenPWA {
+            constructor() {
+                this.deferredPrompt = null;
+                this.installButton = null;
+                this.isInstalled = false;
+                this.init();
+            }
+
+            init() {
+                // Register service worker
+                this.registerServiceWorker();
+
+                // Listen for install prompt
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    console.log('[PWA] Install prompt available');
+                    e.preventDefault();
+                    this.deferredPrompt = e;
+                    this.showInstallButton();
+                });
+
+                // Check if already installed
+                window.addEventListener('appinstalled', () => {
+                    console.log('[PWA] App was installed');
+                    this.isInstalled = true;
+                    this.hideInstallButton();
+                    this.showInstalledMessage();
+                });
+
+                // Handle iOS PWA detection
+                this.detectIOSPWA();
+            }
+
+            async registerServiceWorker() {
+                if ('serviceWorker' in navigator) {
+                    try {
+                        const registration = await navigator.serviceWorker.register('/static/sw.js');
+                        console.log('[PWA] Service Worker registered:', registration.scope);
+
+                        // Listen for updates
+                        registration.addEventListener('updatefound', () => {
+                            console.log('[PWA] New service worker available');
+                        });
+                    } catch (error) {
+                        console.error('[PWA] Service Worker registration failed:', error);
+                    }
+                }
+            }
+
+            showInstallButton() {
+                if (this.isInstalled) return;
+
+                // Create install button if it doesn't exist
+                if (!this.installButton) {
+                    this.installButton = document.createElement('div');
+                    this.installButton.id = 'pwa-install-prompt';
+                    this.installButton.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-3';
+                    this.installButton.style.zIndex = '1050';
+                    this.installButton.innerHTML = `
+                        <div class="card border-0 shadow-lg" style="max-width: 320px;">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <img src="/static/favicon-32x32.png" alt="Splittchen" class="me-2" width="24" height="24">
+                                    <h6 class="card-title mb-0">Install Splittchen</h6>
+                                    <button type="button" class="btn-close ms-auto" onclick="splittchenPWA.hideInstallButton()"></button>
+                                </div>
+                                <p class="card-text small text-muted mb-2">Add to your home screen for quick access and offline use</p>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-primary btn-sm flex-fill" onclick="splittchenPWA.installApp()" title="Install Splittchen">
+                                        <i class="bi bi-download"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="splittchenPWA.hideInstallButton()" style="white-space: nowrap; padding: 0.375rem 1rem;">
+                                        <small>Later</small>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.appendChild(this.installButton);
+
+                    // Show with animation
+                    setTimeout(() => {
+                        this.installButton.querySelector('.card').style.transform = 'translateY(0)';
+                        this.installButton.querySelector('.card').style.opacity = '1';
+                    }, 100);
+                }
+
+                // Don't show immediately - wait for user interaction
+                setTimeout(() => {
+                    if (this.installButton && !this.isInstalled) {
+                        this.installButton.style.display = 'block';
+                    }
+                }, 5000);
+            }
+
+            async installApp() {
+                if (!this.deferredPrompt) {
+                    console.warn('[PWA] No install prompt available');
+                    return;
+                }
+
+                this.hideInstallButton();
+
+                // Show the install prompt
+                this.deferredPrompt.prompt();
+
+                const { outcome } = await this.deferredPrompt.userChoice;
+                console.log('[PWA] User choice:', outcome);
+
+                if (outcome === 'accepted') {
+                    this.isInstalled = true;
+                }
+
+                this.deferredPrompt = null;
+            }
+
+            hideInstallButton() {
+                if (this.installButton) {
+                    const card = this.installButton.querySelector('.card');
+                    if (card) {
+                        card.style.transform = 'translateY(100%)';
+                        card.style.opacity = '0';
+                        setTimeout(() => {
+                            this.installButton.style.display = 'none';
+                        }, 300);
+                    }
+                }
+            }
+
+            showInstalledMessage() {
+                // Show a brief success message
+                const message = document.createElement('div');
+                message.className = 'position-fixed top-0 start-50 translate-middle-x mt-3';
+                message.style.zIndex = '1060';
+                message.innerHTML = `
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i>Splittchen installed successfully!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+
+                document.body.appendChild(message);
+
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    message.remove();
+                }, 5000);
+            }
+
+            detectIOSPWA() {
+                // Detect if we're running as a PWA on iOS
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const isStandalone = window.navigator.standalone === true;
+
+                if (isIOS && !isStandalone) {
+                    // Show iOS-specific install instructions
+                    this.showIOSInstructions();
+                } else if (isStandalone) {
+                    this.isInstalled = true;
+                    console.log('[PWA] Running as installed iOS PWA');
+                }
+            }
+
+            showIOSInstructions() {
+                // Only show for iOS Safari users
+                if (!navigator.userAgent.includes('Safari') || navigator.userAgent.includes('Chrome')) {
+                    return;
+                }
+
+                setTimeout(() => {
+                    const instructions = document.createElement('div');
+                    instructions.id = 'ios-install-prompt';
+                    instructions.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-3';
+                    instructions.style.zIndex = '1050';
+                    instructions.innerHTML = `
+                        <div class="card border-0 shadow-lg" style="max-width: 350px;">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <img src="/static/favicon-32x32.png" alt="Splittchen" class="me-2" width="24" height="24">
+                                    <h6 class="card-title mb-0">Install Splittchen</h6>
+                                    <button type="button" class="btn-close ms-auto" onclick="document.getElementById('ios-install-prompt').remove()"></button>
+                                </div>
+                                <p class="card-text small text-muted mb-2">Add to your home screen:</p>
+                                <ol class="small text-muted mb-2 ps-3">
+                                    <li>Tap the <i class="bi bi-box-arrow-up"></i> share button</li>
+                                    <li>Tap "Add to Home Screen"</li>
+                                    <li>Tap "Add" to confirm</li>
+                                </ol>
+                                <button class="btn btn-outline-secondary btn-sm w-100" onclick="document.getElementById('ios-install-prompt').remove()">
+                                    Got it
+                                </button>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.appendChild(instructions);
+                }, 8000); // Show after 8 seconds for iOS users
+            }
+        }
+
+        // Global PWA instance
+        window.splittchenPWA = new SplittchenPWA();
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Request notification permission on first user interaction (for PWA)
+            const requestNotificationPermission = () => {
+                if (window.splittchenRealtime.notifications.permission === 'default') {
+                    window.splittchenRealtime.notifications.requestPermissionOnInteraction();
+                }
+            };
+
+            // Add listeners for first interaction
+            ['click', 'touchstart'].forEach(event => {
+                document.addEventListener(event, requestNotificationPermission, { once: true });
+            });
+
+            // Restore active tab on page load (for page reloads)
+            const savedTab = localStorage.getItem('activeTab');
+            if (savedTab) {
+                const tabButton = document.querySelector(`[data-bs-target="${savedTab}"], [data-bs-target="${savedTab}"]`);
+                const tabContent = document.querySelector(savedTab);
+                if (tabButton && tabContent) {
+                    // Remove active from all main page tabs (not modal tabs)
+                    document.querySelectorAll('.nav-tabs:not(.modal .nav-tabs) .nav-link, .mobile-nav-btn').forEach(tab => tab.classList.remove('active'));
+                    document.querySelectorAll('.tab-content:not(.modal .tab-content) .tab-pane').forEach(pane => {
+                        pane.classList.remove('active', 'show');
+                    });
+                    // Activate the saved tab
+                    tabButton.classList.add('active');
+                    tabContent.classList.add('active', 'show');
+                }
+            }
+        });
+    </script>
+    
+    <script>
+    // Global participant color setting (used across all templates)
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-color]').forEach(function(element) {
+            element.style.backgroundColor = element.getAttribute('data-color');
+        });
+    });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

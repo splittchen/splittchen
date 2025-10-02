@@ -1,0 +1,625 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - {{ group.name }} - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="{{ url_for('main.view_group', share_token=group.share_token) }}">{{ group.name }}</a>
+                    </li>
+                    <li class="breadcrumb-item active">Admin Panel</li>
+                </ol>
+            </nav>
+            
+            <!-- Admin Panel Card -->
+            <div class="card">
+                <div class="card-header card-header-gradient">
+                    <h4 class="mb-0">
+                        <i class="bi bi-shield-check me-2"></i>Admin Panel
+                    </h4>
+                </div>
+                
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Admin Access:</strong> You have administrative privileges for this group.
+                    </div>
+                    
+                    <h5 class="mb-3">Group Information</h5>
+                    <div class="mb-4">
+                        <p><strong>Group Name:</strong> {{ group.name }}</p>
+                        {% if group.description %}
+                            <p><strong>Description:</strong> {{ group.description }}</p>
+                        {% endif %}
+                        <p><strong>Participants:</strong> {{ group.participants|length }}</p>
+                        <p><strong>Expenses:</strong> {{ group.expenses|length }}</p>
+                        <p><strong>Status:</strong> 
+                            {% if group.is_settled %}
+                                <span class="badge bg-secondary">Settled</span>
+                            {% elif group.is_expired %}
+                                <span class="badge bg-warning">Expired</span>
+                            {% else %}
+                                <span class="badge bg-success">Active</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <!-- Participants Management -->
+                    <h5 class="mb-3">Participants Management</h5>
+                    <div class="mb-4">
+                        {% if group.participants %}
+                            <div class="table-responsive">
+                                <table class="table table-sm participants-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th class="d-none d-md-table-cell">Email</th>
+                                            <th class="d-none d-md-table-cell">Personal Link</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for participant in group.participants %}
+                                        <tr>
+                                            <td class="participant-name-cell">
+                                                <!-- eslint-disable-next-line -->
+                                                <span style="color: {{ participant.color }};">●</span>
+                                                {{ participant.name }}
+                                                <div class="d-md-none participant-mobile-info">
+                                                    {% if participant.email %}
+                                                        <small class="text-muted">{{ participant.email }}</small>
+                                                    {% else %}
+                                                        <small class="text-muted">No email</small>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td class="d-none d-md-table-cell">
+                                                {% if participant.email %}
+                                                    <small>{{ participant.email }}</small>
+                                                {% else %}
+                                                    <small class="text-muted">No email</small>
+                                                {% endif %}
+                                            </td>
+                                            <td class="d-none d-md-table-cell">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text" class="form-control font-monospace"
+                                                           value="{{ request.url_root }}p/{{ participant.access_token }}"
+                                                           readonly id="participantLink{{ participant.id }}">
+                                                    <button class="btn btn-outline-secondary btn-sm"
+                                                            onclick="copyToClipboard('participantLink{{ participant.id }}')">
+                                                        <i class="bi bi-clipboard"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="participant-actions">
+                                                    <!-- Mobile: Copy button for personal link -->
+                                                    <div class="d-md-none">
+                                                        <input type="text" class="d-none"
+                                                               value="{{ request.url_root }}p/{{ participant.access_token }}"
+                                                               readonly id="participantLinkMobile{{ participant.id }}">
+                                                        <button class="btn btn-outline-secondary btn-sm me-1"
+                                                                onclick="copyToClipboard('participantLinkMobile{{ participant.id }}')">
+                                                            <i class="bi bi-clipboard"></i>
+                                                        </button>
+                                                    </div>
+                                                    <!-- Email button -->
+                                                    {% if participant.email %}
+                                                        <button class="btn btn-outline-primary btn-sm"
+                                                                onclick="resendInvitation('{{ participant.id }}', '{{ participant.email }}', '{{ participant.name }}')">
+                                                            <i class="bi bi-envelope"></i>
+                                                        </button>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">No participants in this group yet.</p>
+                        {% endif %}
+                        
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addParticipantModal">
+                                <i class="bi bi-person-plus me-2"></i>Add Participant
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mb-3">Admin Actions</h5>
+                    
+                    {% if not group.is_settled and not group.is_expired %}
+                        <!-- Settlement Options -->
+                        <div class="btn-group-mobile mb-3">
+                            <button type="button" class="btn btn-primary" onclick="confirmSettleOnly()">
+                                <i class="bi bi-send me-2"></i>Send Settlement
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="confirmSettle()">
+                                <i class="bi bi-check-circle me-2"></i>Settle & Close
+                            </button>
+                        </div>
+                        
+                        <div class="text-center mb-3">
+                            <small class="text-muted">
+                                Settlement sends payment summaries to all participants
+                            </small>
+                        </div>
+                        
+                        <!-- Add Participant Option -->
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="button" class="btn btn-outline-success btn-lg" onclick="showAddParticipantModal()">
+                                <i class="bi bi-person-plus me-2"></i>Add Participant
+                            </button>
+                            <small class="text-muted">
+                                Directly add a participant without requiring them to join via link
+                            </small>
+                        </div>
+                        
+                        <!-- Remove Expiration Option -->
+                        {% if group.expires_at %}
+                            <div class="d-grid gap-2 mb-3">
+                                <button type="button" class="btn btn-outline-warning btn-lg" onclick="confirmRemoveExpiration()">
+                                    <i class="bi bi-calendar-x me-2"></i>Remove Expiration Date
+                                </button>
+                                <small class="text-muted">
+                                    Currently expires on {{ group.expires_at.strftime('%d.%m.%Y') }}. Remove to make this a normal group.
+                                </small>
+                            </div>
+                        {% endif %}
+                    {% elif group.is_settled or group.is_expired %}
+                        <!-- Reopen Group -->
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="button" class="btn btn-warning btn-lg" onclick="confirmReopen()">
+                                <i class="bi bi-unlock me-2"></i>Reopen Group
+                            </button>
+                            <small class="text-muted">
+                                {% if group.is_settled %}
+                                    This will unlock the group and allow adding new expenses. Previously sent settlement reports will remain valid for existing balances.
+                                {% else %}
+                                    This will remove the expired status and allow adding new expenses. You may want to adjust the expiration date after reopening.
+                                {% endif %}
+                            </small>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- View Group -->
+                    <div class="d-grid gap-2 mb-3">
+                        <a href="{{ url_for('main.view_group', share_token=group.share_token) }}" class="btn btn-outline-primary">
+                            <i class="bi bi-eye me-2"></i>View Group
+                        </a>
+                    </div>
+                    
+                    <!-- Danger Zone -->
+                    <div class="border-top pt-4 mt-4">
+                        <h6 class="text-danger mb-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Danger Zone
+                        </h6>
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="button" class="btn btn-outline-danger" onclick="confirmDelete()">
+                                <i class="bi bi-trash me-2"></i>Delete Group Permanently
+                            </button>
+                            <small class="text-muted">
+                                <strong>Warning:</strong> This will permanently delete the group and ALL associated data including expenses, participants, and history. This action cannot be undone!
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Share Links -->
+                    <div class="mb-4">
+                        <h6>Share Links</h6>
+                        <div class="mb-2">
+                            <label class="form-label small">Group Share Link (for participants):</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" readonly 
+                                       value="{{ request.url_root }}join/{{ group.share_token }}" 
+                                       id="shareUrl">
+                                <button class="btn btn-outline-secondary" onclick="copyToClipboard('shareUrl')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Admin Link (keep private):</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" readonly 
+                                       value="{{ request.url_root }}admin/{{ admin_token }}" 
+                                       id="adminUrl">
+                                <button class="btn btn-outline-secondary" onclick="copyToClipboard('adminUrl')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Participant Modal -->
+<div class="modal fade" id="addParticipantModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Participant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addParticipantForm" method="POST" action="{{ url_for('main.admin_add_participant', admin_token=admin_token) }}">
+                <div class="modal-body">
+                    <p>Add a participant directly to the group without requiring them to join via link.</p>
+                    
+                    <div class="mb-3">
+                        <label for="participantName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="participantName" name="name" required maxlength="50" 
+                               placeholder="Enter participant name">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="participantEmail" class="form-label">Email (Optional)</label>
+                        <input type="email" class="form-control" id="participantEmail" name="email" 
+                               placeholder="Enter email for notifications">
+                        <div class="form-text">Email is optional but recommended for settlement notifications</div>
+                    </div>
+                    
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-person-plus me-2"></i>Add Participant
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Settle Confirmation Modal -->
+<div class="modal fade" id="settleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Settle Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to settle this group?</strong></p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Calculate final balances for all participants</li>
+                    <li>Send settlement reports via email to all participants</li>
+                    <li>Lock the group (no more expenses can be added)</li>
+                    <li>Mark the group as settled</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> You can reopen this group later if needed. Settled groups can be reopened by administrators.
+                </div>
+                <div class="alert alert-warning small">
+                    <i class="bi bi-clock me-1"></i>
+                    Sending settlement emails may take several seconds. Please wait for confirmation.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="settleCancelBtn">Cancel</button>
+                <form method="POST" action="{{ url_for('main.settle_group', share_token=group.share_token) }}" style="display: inline;" id="settleForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger" id="settleSubmitBtn">
+                        <span class="btn-text">
+                            <i class="bi bi-check-circle me-2"></i>Yes, Settle Group
+                        </span>
+                        <span class="btn-loading d-none">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Settling and sending emails...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reopen Confirmation Modal -->
+<div class="modal fade" id="reopenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reopen Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to reopen this settled group?</strong></p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Unlock the group to allow new expenses</li>
+                    <li>Allow participants to add more expenses</li>
+                    <li>Reset the settled status (group can be settled again later)</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> Previously sent settlement reports will remain valid for the existing balances. New expenses will change the balances and may require a new settlement.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('main.reopen_group', share_token=group.share_token) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-unlock me-2"></i>Yes, Reopen Group
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settle Only Modal -->
+<div class="modal fade" id="settleOnlyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Send Settlement Reports</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Send settlement reports without closing the group?</strong></p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Calculate current balances for all participants</li>
+                    <li>Send settlement reports via email to all participants</li>
+                    <li>Keep the group open for new expenses</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Perfect for monthly bills:</strong> Participants can settle up and continue adding expenses for the next period.
+                </div>
+                <div class="alert alert-warning small">
+                    <i class="bi bi-clock me-1"></i>
+                    Sending settlement emails may take several seconds. Please wait for confirmation.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="settleOnlyCancelBtn">Cancel</button>
+                <form method="POST" action="{{ url_for('main.settle_only_group', share_token=group.share_token) }}" style="display: inline;" id="settleOnlyForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-primary" id="settleOnlySubmitBtn">
+                        <span class="btn-text">
+                            <i class="bi bi-send me-2"></i>Yes, Send Reports
+                        </span>
+                        <span class="btn-loading d-none">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Sending emails...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Expiration Modal -->
+<div class="modal fade" id="removeExpirationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Remove Expiration Date</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to remove the expiration date from this group?</strong></p>
+                {% if group.expires_at %}
+                    <p>This group is currently set to expire on <strong>{{ group.expires_at.strftime('%d.%m.%Y') }}</strong>.</p>
+                {% endif %}
+                <p>Removing the expiration date will:</p>
+                <ul>
+                    <li>Convert this group to a normal (non-expiring) group</li>
+                    <li>Prevent automatic settlement and closure on the expiration date</li>
+                    <li>Allow the group to remain active indefinitely</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> You can always set a new expiration date later if needed, or use the settlement options to close the group manually.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('main.remove_expiration_date', share_token=group.share_token) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-calendar-x me-2"></i>Yes, Remove Expiration Date
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Delete Group Permanently
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>CRITICAL WARNING:</strong> This action is permanent and cannot be undone!
+                </div>
+                
+                <p><strong>You are about to permanently delete "{{ group.name }}" and ALL associated data.</strong></p>
+                
+                <p>This will delete:</p>
+                <ul>
+                    <li><strong>{{ group.expenses|length }} expenses</strong> with all payment records</li>
+                    <li><strong>{{ group.participants|length }} participants</strong> and their information</li>
+                    <li><strong>All expense shares</strong> and balance calculations</li>
+                    <li><strong>All audit logs</strong> and activity history</li>
+                    <li><strong>All settlement periods</strong> (if any)</li>
+                    <li><strong>The group itself</strong> including share links</li>
+                </ul>
+                
+                <div class="alert alert-warning">
+                    <i class="bi bi-shield-exclamation me-2"></i>
+                    <strong>Before you proceed:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Make sure all participants have settled their balances</li>
+                        <li>Consider downloading/saving any important expense data</li>
+                        <li>Inform participants that the group will be deleted</li>
+                    </ul>
+                </div>
+                
+                <p class="mb-0"><strong>Type the group name to confirm deletion:</strong></p>
+                <input type="text" class="form-control mt-2" id="confirmGroupName" placeholder="Enter group name exactly: {{ group.name }}">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </button>
+                <form method="POST" action="{{ url_for('main.delete_group', share_token=group.share_token) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger" id="confirmDeleteBtn" disabled>
+                        <i class="bi bi-trash me-2"></i>Yes, Delete Group Permanently
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmSettle() {
+    const modal = new bootstrap.Modal(document.getElementById('settleModal'));
+    modal.show();
+}
+
+function confirmReopen() {
+    const modal = new bootstrap.Modal(document.getElementById('reopenModal'));
+    modal.show();
+}
+
+function confirmSettleOnly() {
+    const modal = new bootstrap.Modal(document.getElementById('settleOnlyModal'));
+    modal.show();
+}
+
+function confirmRemoveExpiration() {
+    const modal = new bootstrap.Modal(document.getElementById('removeExpirationModal'));
+    modal.show();
+}
+
+function showAddParticipantModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addParticipantModal'));
+    modal.show();
+}
+
+function confirmDelete() {
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+    
+    // Reset the confirmation input and disable button
+    document.getElementById('confirmGroupName').value = '';
+    document.getElementById('confirmDeleteBtn').disabled = true;
+}
+
+// Enable delete button only when group name is correctly typed
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmInput = document.getElementById('confirmGroupName');
+    const deleteBtn = document.getElementById('confirmDeleteBtn');
+    // eslint-disable-next-line
+    const groupName = {{ group.name|tojson }};
+
+    if (confirmInput && deleteBtn) {
+        confirmInput.addEventListener('input', function() {
+            deleteBtn.disabled = confirmInput.value !== groupName;
+        });
+    }
+
+    // Add loading states to settlement forms
+    const settleForm = document.getElementById('settleForm');
+    const settleSubmitBtn = document.getElementById('settleSubmitBtn');
+    const settleCancelBtn = document.getElementById('settleCancelBtn');
+
+    if (settleForm && settleSubmitBtn) {
+        settleForm.addEventListener('submit', function(e) {
+            settleSubmitBtn.disabled = true;
+            settleCancelBtn.disabled = true;
+            settleSubmitBtn.querySelector('.btn-text').classList.add('d-none');
+            settleSubmitBtn.querySelector('.btn-loading').classList.remove('d-none');
+        });
+    }
+
+    const settleOnlyForm = document.getElementById('settleOnlyForm');
+    const settleOnlySubmitBtn = document.getElementById('settleOnlySubmitBtn');
+    const settleOnlyCancelBtn = document.getElementById('settleOnlyCancelBtn');
+
+    if (settleOnlyForm && settleOnlySubmitBtn) {
+        settleOnlyForm.addEventListener('submit', function(e) {
+            settleOnlySubmitBtn.disabled = true;
+            settleOnlyCancelBtn.disabled = true;
+            settleOnlySubmitBtn.querySelector('.btn-text').classList.add('d-none');
+            settleOnlySubmitBtn.querySelector('.btn-loading').classList.remove('d-none');
+        });
+    }
+});
+
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    element.select();
+    element.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(element.value).then(() => {
+        // Show feedback
+        const button = element.nextElementSibling;
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check"></i>';
+        button.classList.add('btn-success');
+        button.classList.remove('btn-outline-secondary');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHtml;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+        }, 2000);
+    });
+}
+
+function resendInvitation(participantId, email, name) {
+    if (confirm(`Resend invitation email to ${name} (${email})?`)) {
+        fetch(`{{ url_for('main.admin_panel', admin_token=admin_token) }}/resend-invitation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                participant_id: participantId,
+                email: email,
+                name: name
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Invitation resent to ${email}!`);
+            } else {
+                alert(`Failed to send invitation: ${data.message || 'Unknown error'}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to send invitation. Please try again.');
+        });
+    }
+}
+</script>
+{% endblock %}

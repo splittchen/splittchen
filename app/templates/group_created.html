@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Group Created - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <!-- Success Message -->
+            <div class="alert alert-success text-center mb-4">
+                <i class="bi bi-check-circle-fill me-2" style="font-size: 1.5rem;"></i>
+                <h4 class="alert-heading mb-2">Group Created Successfully!</h4>
+                <p class="mb-0">Your expense group "{{ group.name }}" is ready to go.</p>
+            </div>
+            
+            <!-- Group Details Card -->
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header card-header-gradient">
+                    <h5 class="mb-0">
+                        <i class="bi bi-share me-2"></i>Share Your Group
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Group Token -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Group Token</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control font-monospace fs-5 text-center fw-bold" 
+                                   value="{{ group.share_token }}" readonly id="groupToken">
+                            <button class="btn" style="border: 1px solid var(--primary-green); color: var(--primary-green);" type="button" onclick="copyToken()" onmouseover="this.style.background='var(--primary-green)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--primary-green)'">
+                                <i class="bi bi-clipboard" id="copyIcon"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Share this code with people you want to invite
+                        </div>
+                    </div>
+                    
+                    <!-- Share URL -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Direct Link</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" value="{{ join_url }}" readonly id="shareUrl">
+                            <button class="btn btn-outline-primary" type="button" onclick="copyUrl()">
+                                <i class="bi bi-link-45deg" id="urlIcon"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Direct link for easy joining
+                        </div>
+                    </div>
+                    
+                    <!-- Email Sharing -->
+                    <div class="mb-3">
+                        <h6 class="fw-semibold">
+                            <i class="bi bi-envelope me-2"></i>Share via Email
+                        </h6>
+                        <p class="text-muted small mb-3">
+                            Send a professional invitation with group details and join link.
+                        </p>
+                        
+                        <form method="POST" action="{{ url_for('main.invite_member', share_token=group.share_token) }}" class="mb-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <div class="input-group">
+                                <input type="email" name="email" class="form-control" 
+                                       placeholder="friend@example.com" required>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-send me-1"></i>Send Invite
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Next Steps -->
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-check-circle me-2"></i>You're All Set!
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li class="mb-2">
+                            <strong>✅ You're already in the group</strong> - No need to join separately
+                        </li>
+                        <li class="mb-2">
+                            <strong>Invite others</strong> - Share the token or send email invitations
+                        </li>
+                        <li class="mb-0">
+                            <strong>Start splitting</strong> - Add your first expense and track who owes what
+                        </li>
+                    </ol>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2 mt-4">
+                <a href="{{ url_for('main.view_group', share_token=group.share_token) }}" 
+                   class="btn btn-primary btn-lg">
+                    <i class="bi bi-arrow-right me-2"></i>Go to Group Dashboard
+                </a>
+                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-house me-2"></i>Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToken() {
+    const tokenInput = document.getElementById('groupToken');
+    const icon = document.getElementById('copyIcon');
+    
+    navigator.clipboard.writeText(tokenInput.value).then(() => {
+        icon.className = 'bi bi-check-lg text-success';
+        setTimeout(() => {
+            icon.className = 'bi bi-clipboard';
+        }, 2000);
+    });
+}
+
+function copyUrl() {
+    const urlInput = document.getElementById('shareUrl');
+    const icon = document.getElementById('urlIcon');
+    
+    navigator.clipboard.writeText(urlInput.value).then(() => {
+        icon.className = 'bi bi-check-lg text-success';
+        setTimeout(() => {
+            icon.className = 'bi bi-link-45deg';
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

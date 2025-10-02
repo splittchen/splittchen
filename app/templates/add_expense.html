@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Add Expense - {{ group.name }} - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-4" 
+     data-participant-count="{{ group.participants|length }}"
+     data-current-user-id="{{ participant.id }}"
+     data-default-currency="{{ group.currency }}">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="{{ url_for('main.view_group', share_token=group.share_token) }}">{{ group.name }}</a>
+                    </li>
+                    <li class="breadcrumb-item active">Add Expense</li>
+                </ol>
+            </nav>
+            
+            <!-- Form Card -->
+            <div class="card">
+                <div class="card-header card-header-gradient">
+                    <h4 class="mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>Add New Expense
+                    </h4>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" novalidate>
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                {{ form.title.label(class="form-label fw-semibold") }}
+                                {{ form.title(class="form-control" + (" is-invalid" if form.title.errors else ""), 
+                                             placeholder="e.g., Dinner at restaurant, Gas for trip") }}
+                                {% if form.title.errors %}
+                                    <div class="invalid-feedback">{{ form.title.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                {{ form.amount.label(class="form-label fw-semibold") }}
+                                <div class="input-group">
+                                    <span class="input-group-text" id="currency-symbol"><i class="bi bi-cash-coin"></i></span>
+                                    {{ form.amount(class="form-control" + (" is-invalid" if form.amount.errors else ""), 
+                                                  placeholder="0.00", step="0.01") }}
+                                </div>
+                                {% if form.amount.errors %}
+                                    <div class="invalid-feedback">{{ form.amount.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.description.label(class="form-label fw-semibold") }}
+                            {{ form.description(class="form-control", placeholder="Additional details (optional)", rows="3") }}
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.currency.label(class="form-label fw-semibold") }}
+                                {{ form.currency(class="form-select" + (" is-invalid" if form.currency.errors else ""), onchange="updateCurrencySymbol()") }}
+                                {% if form.currency.errors %}
+                                    <div class="invalid-feedback">{{ form.currency.errors[0] }}</div>
+                                {% endif %}
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Group default: {{ group.currency }}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                {{ form.category.label(class="form-label fw-semibold") }}
+                                {{ form.category(class="form-select") }}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                {{ form.date.label(class="form-label fw-semibold") }}
+                                {{ form.date(class="form-control" + (" is-invalid" if form.date.errors else "")) }}
+                                {% if form.date.errors %}
+                                    <div class="invalid-feedback">{{ form.date.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.paid_by_id.label(class="form-label fw-semibold") }}
+                                {{ form.paid_by_id(class="form-select" + (" is-invalid" if form.paid_by_id.errors else "")) }}
+                                {% if form.paid_by_id.errors %}
+                                    <div class="invalid-feedback">{{ form.paid_by_id.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.split_type.label(class="form-label fw-semibold") }}
+                                {{ form.split_type(class="form-select") }}
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Equal splits with custom participant selection supported
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Split Between Selection -->
+                        <div class="mb-4">
+                            {{ form.split_between.label(class="form-label fw-semibold") }}
+                            <div class="row">
+                                {% for p in group.participants %}
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input split-participant" 
+                                                   type="checkbox" 
+                                                   name="split_between" 
+                                                   value="{{ p.id }}" 
+                                                   id="split-{{ p.id }}"
+                                                   checked>
+                                            <label class="form-check-label d-flex align-items-center" for="split-{{ p.id }}">
+                                                <span class="participant-color me-2" data-color="{{ p.color }}"></span>
+                                                {{ p.name }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% if form.split_between.errors %}
+                                <div class="text-danger mt-1">{{ form.split_between.errors[0] }}</div>
+                            {% endif %}
+                            <div class="form-text mt-2">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Select the people who should pay for this expense. By default, everyone is selected.
+                            </div>
+                        </div>
+                        
+                        <!-- Participants Preview -->
+                        <div class="card mb-4" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="bi bi-people me-2"></i>Split Among ({{ group.participants|length }} people)
+                                </h6>
+                                <div class="row">
+                                    {% for p in group.participants %}
+                                        <div class="col-md-6 mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <span class="participant-color me-2" data-color="{{ p.color }}"></span>
+                                                <span>{{ p.name }}</span>
+                                                <span class="badge ms-auto" style="background-color: var(--text-muted); color: var(--bg-card);" id="share-{{ p.id }}">
+                                                    {{ group.currency }} 0.00
+                                                </span>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary-green btn-lg">
+                                <i class="bi bi-plus-circle me-2"></i>Add Expense
+                            </button>
+                            <a href="{{ url_for('main.view_group', share_token=group.share_token) }}" 
+                               class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Back to Group
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Participant colors are handled globally in base.html
+
+// Currency symbols mapping
+const currencySymbols = {
+    'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'CAD': 'C$',
+    'AUD': 'A$', 'CHF': 'CHF', 'CNY': '¥', 'SEK': 'kr', 'NOK': 'kr',
+    'DKK': 'kr', 'PLN': 'zł', 'CZK': 'Kč', 'HUF': 'Ft', 'RUB': '₽',
+    'BRL': 'R$', 'INR': '₹', 'KRW': '₩', 'SGD': 'S$', 'HKD': 'HK$',
+    'NZD': 'NZ$'
+};
+
+// Update currency symbol when currency changes
+function updateCurrencySymbol() {
+    const currencySelect = document.getElementById('currency');
+    const symbolSpan = document.getElementById('currency-symbol');
+    const selectedCurrency = currencySelect.value;
+    symbolSpan.textContent = currencySymbols[selectedCurrency] || selectedCurrency;
+}
+
+// Update share preview when amount or participant selection changes
+function updateSharePreview() {
+    const amount = parseFloat(document.getElementById('amount').value) || 0;
+    const selectedParticipants = document.querySelectorAll('.split-participant:checked');
+    const shareAmount = selectedParticipants.length > 0 ? (amount / selectedParticipants.length) : 0;
+    const currencySelect = document.getElementById('currency');
+    const symbol = currencySymbols[currencySelect.value] || currencySelect.value;
+    
+    // Update the header to show selected count
+    const container = document.querySelector('.container.py-4');
+    const totalParticipants = container.getAttribute('data-participant-count');
+    const headerElement = document.querySelector('.card-title');
+    headerElement.innerHTML = `<i class="bi bi-people me-2"></i>Split Among (${selectedParticipants.length} of ${totalParticipants} people)`;
+    
+    // Update individual share amounts
+    document.querySelectorAll('input[type="checkbox"][id^="split-"]').forEach(checkbox => {
+        const participantId = checkbox.id.replace('split-', '');
+        const shareElement = document.getElementById('share-' + participantId);
+        if (shareElement) {
+            if (checkbox.checked) {
+                shareElement.textContent = symbol + ' ' + shareAmount.toFixed(2);
+                shareElement.style.opacity = '1';
+            } else {
+                shareElement.textContent = symbol + ' 0.00';
+                shareElement.style.opacity = '0.5';
+            }
+        }
+    });
+}
+
+document.getElementById('amount').addEventListener('input', updateSharePreview);
+
+// Add event listeners to all participant checkboxes
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.split-participant').forEach(checkbox => {
+        checkbox.addEventListener('change', updateSharePreview);
+    });
+});
+
+// Set current date/time as default and update share previews
+document.addEventListener('DOMContentLoaded', function() {
+    // Set current date/time as default if not already set
+    const dateField = document.getElementById('date');
+    if (!dateField.value) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        dateField.value = now.toISOString().slice(0, 16);
+    }
+    
+    // Set default paid_by to current user if not already set
+    const paidBySelect = document.getElementById('paid_by_id');
+    const currentUserId = container.getAttribute('data-current-user-id');
+    if (!paidBySelect.value) {
+        paidBySelect.value = currentUserId;
+    }
+    
+    // Set currency default to group default currency if not already set
+    const currencySelect = document.getElementById('currency');
+    const defaultCurrency = container.getAttribute('data-default-currency');
+    if (!currencySelect.value) {
+        currencySelect.value = defaultCurrency;
+    }
+    
+    // Update currency symbol and share preview on page load
+    updateCurrencySymbol();
+    updateSharePreview();
+});
+</script>
+{% endblock %}

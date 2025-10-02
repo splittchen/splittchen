@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Gone - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <img src="https://http.cat/410" alt="410 Gone" class="img-fluid mb-3" style="max-width: 300px;">
+            <h1 class="display-4 mt-3">410</h1>
+            <h2 class="h4 text-muted mb-4">Gone</h2>
+            <p class="lead mb-4">
+                This group has expired or is no longer available.
+            </p>
+            <div class="d-grid gap-2 d-md-block">
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+                    <i class="bi bi-house me-2"></i>Go Home
+                </a>
+                <a href="{{ url_for('main.create_group') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-plus-circle me-2"></i>Create New Group
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

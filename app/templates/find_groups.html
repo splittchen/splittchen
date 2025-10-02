@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Find My Groups - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h2 class="mb-3">
+                    <i class="bi bi-search me-2"></i>Find My Groups
+                </h2>
+                <p class="text-muted">
+                    Enter your email address to get links to all your active Splittchen groups.
+                </p>
+            </div>
+            
+            <!-- Search Form -->
+            <div class="card">
+                <div class="card-header card-header-gradient text-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-envelope me-2"></i>Group Retrieval
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" novalidate>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="mb-3">
+                            <label for="email" class="form-label fw-semibold">Email Address</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-envelope"></i>
+                                </span>
+                                <input type="email" 
+                                       class="form-control" 
+                                       id="email" 
+                                       name="email" 
+                                       placeholder="your.email@example.com" 
+                                       required>
+                            </div>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                We'll search for groups where you are a participant with this email address.
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary-green btn-lg">
+                                <i class="bi bi-search me-2"></i>Find My Groups
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Email Sent Confirmation -->
+            {% if email_sent %}
+            <div class="card mt-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-circle me-2"></i>Email Sent Successfully!
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-envelope-check me-2"></i>
+                        <strong>Request processed for {{ found_email }}</strong>
+                        <p class="mb-2 mt-2">
+                            If there are active groups associated with this email address, links have been sent directly to your inbox. 
+                            Please check your email for group access links.
+                        </p>
+                        <p class="mb-0">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                If groups exist, the email will include an "Import All Groups" button for easy access on this device.
+                            </small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Information Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-shield-check me-2"></i>How it works
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li class="mb-2">
+                            <strong>Privacy First:</strong> We only search for groups where you're already a participant
+                        </li>
+                        <li class="mb-2">
+                            <strong>Email-Only Access:</strong> Group links are never displayed on screen - only sent via secure email
+                        </li>
+                        <li class="mb-2">
+                            <strong>Active Groups Only:</strong> We only include groups that are still active (not settled/closed)
+                        </li>
+                        <li>
+                            <strong>No Account Required:</strong> No passwords or personal data stored beyond your participation in groups
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Back to Home -->
+            <div class="text-center mt-4">
+                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-focus email input
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('email').focus();
+});
+
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const email = document.getElementById('email').value.trim();
+    if (!email) {
+        e.preventDefault();
+        alert('Please enter an email address.');
+        document.getElementById('email').focus();
+        return false;
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        e.preventDefault();
+        alert('Please enter a valid email address.');
+        document.getElementById('email').focus();
+        return false;
+    }
+});
+</script>
+{% endblock %}
