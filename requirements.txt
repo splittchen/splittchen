@@ -28,5 +28,5 @@ APScheduler>=3.11.0,<4.0.0
 # Real-time WebSocket support
 Flask-SocketIO>=5.3.6,<6.0.0
 python-socketio>=5.11.0,<6.0.0
-gevent>=24.2.1,<25.0.0
+gevent>=24.2.1,<26.0.0
 gevent-websocket>=0.10.1,<1.0.0
