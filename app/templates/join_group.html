@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Join {{ group.name }} - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <!-- Group Info Card -->
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-info text-white text-center">
+                    <h4 class="mb-0">
+                        <i class="bi bi-people me-2"></i>Join Group
+                    </h4>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Group Details -->
+                    <div class="text-center mb-4">
+                        <h3 class="text-primary">{{ group.name }}</h3>
+                        {% if group.description %}
+                            <p class="text-muted">{{ group.description }}</p>
+                        {% endif %}
+                        
+                        <div class="row text-center mt-3">
+                            <div class="col-6">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-0">{{ group.member_count }}</h5>
+                                    <small class="text-muted">Member{{ 's' if group.member_count != 1 else '' }}</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="text-success mb-0">
+                                    <i class="bi bi-check-circle me-1"></i>Active
+                                </h6>
+                                <small class="text-muted">Ready to join</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if group.expires_at %}
+                        <div class="alert alert-info small">
+                            <i class="bi bi-clock me-2"></i>
+                            <strong>Expires:</strong> {{ group.expires_at.strftime('%d.%m.%Y at %H:%M') }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Join Form -->
+            <div class="card shadow border-0">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-plus me-2"></i>Add Yourself
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Display form errors (including CSRF) -->
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <strong>Form Errors:</strong>
+                            <ul class="mb-0">
+                                {% for field_name, field_errors in form.errors.items() %}
+                                    {% for error in field_errors %}
+                                        <li>{{ field_name }}: {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                    
+                    <form method="POST" action="{{ url_for('main.add_participant', share_token=share_token) }}" novalidate>
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.name.label(class="form-label fw-semibold") }}
+                            {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else ""), 
+                                         placeholder="Enter your name") }}
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback">{{ form.name.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            {{ form.email.label(class="form-label fw-semibold") }}
+                            {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), 
+                                          placeholder="your@email.com") }}
+                            {% if form.email.errors %}
+                                <div class="invalid-feedback">{{ form.email.errors[0] }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                {% if invite_email %}
+                                    <i class="bi bi-check-circle text-success me-1"></i>
+                                    Email auto-filled from invitation. You can change it if needed.
+                                {% else %}
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Used for expense notifications and participant identification
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-person-plus me-2"></i>Join
+                            </button>
+                            <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Back to Home
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Help Card -->
+            <div class="card mt-4 border-primary">
+                <div class="card-body">
+                    <h6 class="card-title text-primary">
+                        <i class="bi bi-question-circle me-2"></i>What's Next?
+                    </h6>
+                    <ul class="mb-0 small">
+                        <li>Add yourself as a participant with your name</li>
+                        <li>View existing expenses and group balances</li>
+                        <li>Add new expenses and split them with the group</li>
+                        <li>Invite more people via email if needed</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

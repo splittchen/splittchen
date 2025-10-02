@@ -1,0 +1,79 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+*.md
+
+# Python cache and environments
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+env
+venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.mypy_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.venv
+.env
+.env.*
+!.env.example
+
+# Development files
+.vscode
+.idea
+.claude
+.cursor
+.copilot
+*.swp
+*.swo
+*~
+
+# Database files (local development)
+*.db
+*.sqlite
+*.sqlite3
+splittchen.db
+
+# Docker development files
+docker-compose.override.yml
+docker-compose_local.yml
+Dockerfile.dev
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Instance files (created by Docker volume)
+instance/
+
+# Temporary files
+tmp/
+temp/
+
+# Build and deployment scripts (not needed in container)
+*.ps1
+build.sh
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Test files and directories
+tests/
+test/
+*.spec

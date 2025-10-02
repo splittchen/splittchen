@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Create Group - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="text-center mb-4">
+                <h1 class="mb-3">
+                    <i class="bi bi-plus-circle me-2"></i>Create New Group
+                </h1>
+                <p class="text-muted">Start splitting expenses with your friends</p>
+            </div>
+            
+            <div class="card">
+                <div class="card-body p-4">
+                    <form method="POST" novalidate>
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.group_name.label(class="form-label fw-semibold") }}
+                            {{ form.group_name(class="form-control" + (" is-invalid" if form.group_name.errors else ""), 
+                                         placeholder="e.g., Weekend Trip, Dinner Party") }}
+                            {% if form.group_name.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.group_name.errors[0] }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.your_name.label(class="form-label fw-semibold") }}
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-person"></i>
+                                </span>
+                                {{ form.your_name(class="form-control" + (" is-invalid" if form.your_name.errors else ""), 
+                                                  placeholder="Your name") }}
+                            </div>
+                            {% if form.your_name.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.your_name.errors[0] }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.email.label(class="form-label fw-semibold") }}
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-envelope"></i>
+                                </span>
+                                {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), 
+                                              placeholder="your.email@example.com") }}
+                            </div>
+                            {% if form.email.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.email.errors[0] }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                You'll be automatically added to the group and receive a confirmation email
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.default_currency.label(class="form-label fw-semibold") }}
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-cash-coin"></i>
+                                </span>
+                                {{ form.default_currency(class="form-control" + (" is-invalid" if form.default_currency.errors else "")) }}
+                            </div>
+                            {% if form.default_currency.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.default_currency.errors[0] }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Default currency for the group. Members can add expenses in different currencies. (System default: {{ system_default_currency }})
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.description.label(class="form-label fw-semibold") }}
+                            {{ form.description(class="form-control", 
+                                               placeholder="Brief description of what you're splitting...",
+                                               rows="3") }}
+                            {% if form.description.errors %}
+                                <div class="text-danger small">
+                                    {{ form.description.errors[0] }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            {{ form.expires_at.label(class="form-label fw-semibold") }}
+                            {{ form.expires_at(class="form-control") }}
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Optional: Group becomes read-only after this date
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="form-check">
+                                {{ form.is_recurring(class="form-check-input") }}
+                                {{ form.is_recurring.label(class="form-check-label fw-semibold") }}
+                            </div>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <strong>Perfect for recurring bills:</strong> Automatically settle balances every month on the last day. 
+                                Members get settlement reports via email, and the group stays open for new expenses.
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary-green btn-lg">
+                                <i class="bi bi-plus-circle me-2"></i>Create Group
+                            </button>
+                            <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Back to Home
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Info Card -->
+            <div class="card mt-4" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
+                <div class="card-body">
+                    <h6 class="card-title" style="color: var(--primary-green);">
+                        <i class="bi bi-lightbulb me-2"></i>What happens next?
+                    </h6>
+                    <ul class="mb-0 small">
+                        <li>You'll get a unique group token to share</li>
+                        <li>Add yourself as the first participant</li>
+                        <li>Invite others via email or sharing the token</li>
+                        <li>Start tracking and splitting expenses</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

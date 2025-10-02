@@ -1,0 +1,1563 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group.name }} - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-4" 
+     data-share-token="{{ group.share_token }}"
+     data-base-url="{{ request.host_url }}">
+    <!-- Group Header -->
+    <div class="card mb-4">
+        <div class="card-body p-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2 class="mb-2">{{ group.name }}</h2>
+                    {% if group.description %}
+                        <p class="text-muted mb-2">{{ group.description }}</p>
+                    {% endif %}
+                    
+                    <!-- Members badge under group name -->
+                    <div class="mb-2">
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-people me-1"></i>{{ group.member_count }} member{{ 's' if group.member_count != 1 else '' }}
+                        </span>
+                    </div>
+                    
+                    <!-- Other badges below -->
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-primary">
+                            <i class="bi bi-cash-coin me-1"></i>{{ group.currency }}
+                        </span>
+                        {% if is_admin %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-gear me-1"></i>Admin
+                            </span>
+                        {% endif %}
+                        {% if group.is_recurring %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-arrow-repeat me-1"></i>Recurring
+                            </span>
+                        {% endif %}
+                        {% if group.expires_at and not group.is_expired %}
+                            <span class="badge bg-warning">
+                                <i class="bi bi-calendar-x me-1"></i>Exp {{ group.expires_at.strftime('%d.%m.%Y') }}
+                            </span>
+                        {% endif %}
+                        {% if group.is_expired %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-clock me-1"></i>Expired
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex gap-1 justify-content-md-end align-items-center">
+                        
+                        <!-- Currency Selector -->
+                        <div class="d-flex align-items-center gap-1 me-1">
+                            <small class="text-muted d-none d-lg-inline">View in:</small>
+                            <form method="GET" id="currencyForm" class="d-inline">
+                                <!-- Preserve other URL parameters -->
+                                {% for key, value in request.args.items() %}
+                                    {% if key != 'currency' %}
+                                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                    {% endif %}
+                                {% endfor %}
+                                <select name="currency" class="form-select form-select-sm" style="min-width: 80px;" onchange="submitCurrencyForm()" title="View balances in different currency">
+                                    {% for currency_code, currency_name in currency_choices %}
+                                        <option value="{{ currency_code }}" {% if currency_code == display_currency %}selected{% endif %}>
+                                            {{ currency_code }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        </div>
+                        
+                        <div class="d-none d-md-block">
+                            {% if not group.is_expired and not group.is_settled %}
+                                <a href="{{ url_for('main.add_expense', share_token=group.share_token) }}"
+                                   class="btn btn-primary">
+                                    <i class="bi bi-plus me-1"></i>Add Expense
+                                </a>
+                            {% endif %}
+                        </div>
+                        <button class="btn btn-outline-secondary" onclick="shareGroup()">
+                            <i class="bi bi-share me-1"></i><span class="d-none d-lg-inline">Share & Invite</span><span class="d-lg-none">Share</span>
+                        </button>
+                        {% if is_admin %}
+                            <a href="{{ url_for('main.admin_panel', admin_token=group.admin_token) }}" 
+                               class="btn btn-outline-secondary" title="Admin Panel">
+                                <i class="bi bi-gear"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if group.is_expired %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            This group has expired and is now read-only. No new expenses or participants can be added.
+        </div>
+    {% endif %}
+    
+    <!-- Desktop Tabs (hidden on mobile) -->
+    <ul class="nav nav-tabs mb-4 desktop-tabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#expenses-tab">
+                <i class="bi bi-receipt me-1"></i>Expenses
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#balances-tab">
+                <i class="bi bi-bar-chart me-1"></i>Balances
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#participants-tab">
+                <i class="bi bi-people me-1"></i>Participants
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#history-tab">
+                <i class="bi bi-clock-history me-1"></i>History
+            </button>
+        </li>
+    </ul>
+    
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Expenses Tab -->
+        <div class="tab-pane fade show active" id="expenses-tab">
+            {% if expenses %}
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-receipt me-2"></i>Expenses ({{ expenses|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for expense in expenses %}
+                        <div class="d-flex justify-content-between align-items-start mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ expense.title }}</div>
+                                {% if expense.description %}
+                                    <small class="text-muted d-block">{{ expense.description }}</small>
+                                {% endif %}
+                                <div class="d-flex align-items-center gap-1 mt-1">
+                                    <span class="badge bg-secondary small">{{ expense.category }}</span>
+                                    <small class="text-muted">Split {{ expense.split_type.lower() }}</small>
+                                </div>
+                                {% if expense.expense_shares|length < group.participants|length %}
+                                    <div class="mt-1">
+                                        <small class="text-muted">Split between: </small>
+                                        {% for share in expense.expense_shares %}
+                                            <span class="participant-color-mini me-1" data-color="{{ share.participant.color }}" title="{{ share.participant.name }}"></span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        {{ expense.date.strftime('%d.%m.%Y') }} • Paid by
+                                        <span class="participant-color-mini me-1" data-color="{{ expense.paid_by.color }}"></span>{{ expense.paid_by.name }}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="text-end ms-3">
+                                {% set converted_amount = currency_service.convert_amount(expense.amount, group.currency, display_currency) %}
+                                {% if converted_amount is not none %}
+                                    <div class="fw-bold text-success">{{ converted_amount|currency_suffix(display_currency) }}</div>
+                                {% else %}
+                                    <div class="fw-bold text-success">{{ expense.amount|currency_suffix(group.currency) }}</div>
+                                {% endif %}
+                                {% if expense.currency != display_currency %}
+                                    <small class="text-muted d-block">Original: {{ expense.original_amount|currency_suffix(expense.currency) }}</small>
+                                {% endif %}
+
+                                {% if not group.is_expired and not group.is_settled %}
+                                <div class="mt-2">
+                                    <a href="{{ url_for('main.edit_expense', share_token=group.share_token, expense_id=expense.id) }}"
+                                       class="btn btn-sm btn-outline-primary edit-expense-btn me-1" title="Edit expense">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-danger delete-expense-btn"
+                                            data-expense-id="{{ expense.id }}"
+                                            data-expense-title="{{ expense.title }}"
+                                            title="Delete expense">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-receipt text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="text-muted mt-3">No expenses yet</h4>
+                    <p class="text-muted">Start by adding your first expense to the group.</p>
+                    <div class="d-none d-md-block">
+                        {% if not group.is_expired and not group.is_settled %}
+                            <a href="{{ url_for('main.add_expense', share_token=group.share_token) }}" 
+                               class="btn btn-success">
+                                <i class="bi bi-plus me-2"></i>Add First Expense
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Balances Tab -->
+        <div class="tab-pane fade" id="balances-tab">
+            {% if is_admin and not group.is_settled and not group.is_expired %}
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div>
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Admin Settlement Options:</strong> Send reports to participants and optionally close the group.
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap admin-actions">
+                        <button class="btn btn-primary" onclick="showSettleOnlyModal()">
+                            <i class="bi bi-calculator me-1"></i>Settle
+                        </button>
+                        <button class="btn btn-danger" onclick="showSettleAndCloseModal()">
+                            <i class="bi bi-check-circle me-1"></i>Settle & Close Group
+                        </button>
+                        <a href="{{ url_for('main.admin_panel', admin_token=session.get('admin_' + group.share_token)) }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-gear me-1"></i>More Options
+                        </a>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        <strong>Settle:</strong> Clear current balances, archive expenses to history, send reports, keep group open<br>
+                        <strong>Settle & Close:</strong> Settle and close group permanently (can be reopened by admin)<br>
+                        <strong>More Options:</strong> Remove expiration, reopen, delete group (in Admin Panel)
+                    </small>
+                </div>
+            {% endif %}
+            
+            {% if is_admin and (group.is_settled or group.is_expired) %}
+                <div class="alert alert-warning">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div>
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Admin Options for {% if group.is_expired %}Expired{% else %}Settled{% endif %} Group:</strong> Visit Admin Panel to reopen or delete the group.
+                        </div>
+                    </div>
+                    <a href="{{ url_for('main.admin_panel', admin_token=session.get('admin_' + group.share_token)) }}" class="btn btn-warning">
+                        <i class="bi bi-gear me-2"></i>Go to Admin Panel
+                    </a>
+                </div>
+            {% endif %}
+            
+            {% if group.is_settled %}
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong>Group Settled:</strong> This group was settled on {{ group.settled_at.strftime('%d.%m.%Y at %H:%M') }}. 
+                    Final reports were sent to all participants.
+                </div>
+            {% endif %}
+            
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-wallet me-2"></i>Current Balances
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if balances %}
+                                {% for participant in participants %}
+                                    {% set balance = balances[participant.id] %}
+                                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom balance-item">
+                                        <div class="d-flex align-items-center">
+                                            <span class="participant-color" data-color="{{ participant.color }}"></span>
+                                            <span>{{ participant.name }}</span>
+                                        </div>
+                                        <span class="fw-bold {% if balance > 0 %}balance-positive{% elif balance < 0 %}balance-negative{% else %}balance-zero{% endif %}">
+                                            {{ format_currency_suffix(balance, display_currency) }}
+                                        </span>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center">No expenses to calculate balances</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-arrow-left-right me-2"></i>Suggested Settlements
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if settlements %}
+                                {% for settlement in settlements %}
+                                    {% set from_participant = participants|selectattr('id', 'equalto', settlement.from_participant_id)|first %}
+                                    {% set to_participant = participants|selectattr('id', 'equalto', settlement.to_participant_id)|first %}
+                                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                        <div>
+                                            <span class="participant-color" data-color="{{ from_participant.color }}"></span>
+                                            <strong>{{ from_participant.name }}</strong>
+                                            <i class="bi bi-arrow-right mx-2"></i>
+                                            <span class="participant-color" data-color="{{ to_participant.color }}"></span>
+                                            <strong>{{ to_participant.name }}</strong>
+                                        </div>
+                                        <span class="fw-bold balance-positive">{{ format_currency_suffix(settlement.amount, display_currency) }}</span>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center">
+                                    {% if balances and balances.values()|sum == 0 %}
+                                        All settled up! 🎉
+                                    {% else %}
+                                        No settlements needed
+                                    {% endif %}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Participants Tab -->
+        <div class="tab-pane fade" id="participants-tab">
+            {% if participants %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-people me-2"></i>Participants ({{ participants|length }})
+                            </h5>
+                            {% if is_admin and not group.is_expired and not group.is_settled %}
+                            <button class="btn btn-sm btn-primary" id="addParticipantBtn">
+                                <i class="bi bi-person-plus me-1"></i>Add User
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <!-- Unified Card Body Layout (works for all screen sizes) -->
+                    <div class="card-body">
+                        {% for p in participants %}
+                        <div class="d-flex justify-content-between align-items-start mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}" data-participant-id="{{ p.id }}">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="participant-color me-2" data-color="{{ p.color }}"></span>
+                                    <span class="fw-semibold">{{ p.name }}</span>
+                                </div>
+                                {% if p.email %}
+                                    <small class="text-muted d-block">{{ p.email }}</small>
+                                {% else %}
+                                    <small class="text-muted fst-italic d-block">No email</small>
+                                {% endif %}
+                                <small class="text-muted">Joined {{ p.joined_at.strftime('%d.%m.%Y') }}</small>
+                            </div>
+                            {% if is_admin and not group.is_expired and not group.is_settled %}
+                            <div class="text-end ms-3">
+                                <button class="btn btn-sm btn-outline-primary edit-participant-btn me-1"
+                                        data-participant-id="{{ p.id }}"
+                                        data-participant-name="{{ p.name }}"
+                                        data-participant-email="{{ p.email or '' }}"
+                                        title="Edit participant">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% if participants|length > 1 %}
+                                <button class="btn btn-sm btn-outline-danger remove-participant-btn"
+                                        data-participant-id="{{ p.id }}"
+                                        data-participant-name="{{ p.name }}"
+                                        title="Remove participant">
+                                    <i class="bi bi-person-dash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-people text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="text-muted mt-3">No participants yet</h4>
+                    <p class="text-muted">Participants will appear here when they join the group.</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- History Tab -->
+        <div class="tab-pane fade" id="history-tab">
+            <!-- Activity Log -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap">
+                        <div class="mb-2 mb-md-0">
+                            <h5 class="mb-0">
+                                <i class="bi bi-list-ul me-2"></i>Activity Log
+                            </h5>
+                            <small class="text-muted d-block">(Last 100 activities)</small>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('main.download_history', share_token=group.share_token) }}" 
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-download me-2 d-none d-sm-inline"></i>
+                                <span class="d-none d-sm-inline">Download History</span>
+                                <i class="bi bi-download d-sm-none"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if audit_logs %}
+                        <div class="timeline">
+                            {% for log in audit_logs %}
+                                <div class="timeline-item mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                                    <div class="d-flex">
+                                        <div class="timeline-icon me-3">
+                                            {% if log.action == 'expense_added' %}
+                                                <i class="bi bi-plus-circle text-success"></i>
+                                            {% elif log.action == 'expense_deleted' %}
+                                                <i class="bi bi-trash text-danger"></i>
+                                            {% elif log.action == 'expense_edited' %}
+                                                <i class="bi bi-pencil text-warning"></i>
+                                            {% elif log.action == 'participant_added' %}
+                                                <i class="bi bi-person-plus text-primary"></i>
+                                            {% elif log.action == 'participant_removed' %}
+                                                <i class="bi bi-person-dash text-danger"></i>
+                                            {% elif log.action == 'expenses_transferred' %}
+                                                <i class="bi bi-arrow-right text-info"></i>
+                                            {% elif log.action == 'group_settled' %}
+                                                <i class="bi bi-check-circle text-success"></i>
+                                            {% elif log.action == 'group_settled_period' %}
+                                                <i class="bi bi-calendar-check text-success"></i>
+                                            {% elif log.action == 'group_reopened' %}
+                                                <i class="bi bi-unlock text-warning"></i>
+                                            {% else %}
+                                                <i class="bi bi-record-circle text-muted"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="timeline-content flex-grow-1">
+                                            <!-- Date at top on mobile, side on desktop -->
+                                            <small class="text-muted d-block d-md-none mb-1">
+                                                <i class="bi bi-clock me-1"></i>{{ log.created_at.strftime('%d.%m.%Y %H:%M') }}
+                                            </small>
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div class="flex-grow-1 pe-2">
+                                                    <p class="mb-1"><strong>{{ log.description }}</strong></p>
+                                                    {% if log.performed_by %}
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-person me-1"></i>by {{ log.performed_by }}
+                                                        </small>
+                                                    {% endif %}
+
+                                                    <!-- Additional details for specific actions -->
+                                                    {% if log.details %}
+                                                        <div class="mt-2 history-details">
+                                                            {% if log.action == 'expense_deleted' %}
+                                                                <small class="text-muted d-block">
+                                                                    <i class="bi bi-info-circle me-1"></i>
+                                                                    <span class="d-inline-block">{{ log.details.expense_currency }}{{ "%.2f"|format(log.details.expense_amount) }}</span>
+                                                                    <span class="d-none d-sm-inline"> | </span><br class="d-sm-none">
+                                                                    <span class="d-inline-block">By: {{ log.details.paid_by_name }}</span>
+                                                                    <span class="d-none d-sm-inline"> | </span><br class="d-sm-none">
+                                                                    <span class="d-inline-block">Split: {{ log.details.split_count }}</span>
+                                                                </small>
+                                                            {% elif log.action == 'expenses_transferred' %}
+                                                                <small class="text-muted d-block">
+                                                                    <i class="bi bi-info-circle me-1"></i>
+                                                                    <span class="d-inline-block">{{ log.details.expense_count }} expense{{ 's' if log.details.expense_count != 1 else '' }}</span><br>
+                                                                    <span class="d-inline-block">{{ log.details.from_participant }} → {{ log.details.to_participant }}</span>
+                                                                </small>
+                                                            {% elif log.action == 'group_settled_period' and log.details %}
+                                                                <small class="text-muted d-block">
+                                                                    <i class="bi bi-info-circle me-1"></i>
+                                                                    <span class="d-inline-block">{{ log.details.period_name }}</span>
+                                                                    <span class="d-none d-sm-inline"> | </span><br class="d-sm-none">
+                                                                    <span class="d-inline-block">{{ log.details.expense_count }} expense{{ 's' if log.details.expense_count != 1 else '' }}</span>
+                                                                </small>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <!-- Date on side for desktop only -->
+                                                <small class="text-muted text-nowrap ms-2 d-none d-md-block">
+                                                    {{ log.created_at.strftime('%d.%m.%Y %H:%M') }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-clock-history text-muted" style="font-size: 3rem;"></i>
+                            <h5 class="text-muted mt-3">No Activity Yet</h5>
+                            <p class="text-muted">Group activities and changes will appear here.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Settlement History for Recurring Groups -->
+            {% if group.is_recurring and group.settlement_periods %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Settlement History
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for period in group.settlement_periods|reverse %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">{{ period.period_name }}</h6>
+                                    <p class="mb-1 text-muted">
+                                        <i class="bi bi-calendar me-1"></i>Settled on {{ period.settled_at.strftime('%d.%m.%Y') }}
+                                        <span class="mx-2">•</span>
+                                        <i class="bi bi-people me-1"></i>{{ period.participant_count }} participants
+                                    </p>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-success">{{ format_currency_suffix(period.total_amount, group.currency) }}</span>
+                                    <div class="small text-muted mt-1">Total expenses</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Mobile Bottom Navigation (fixed at bottom) -->
+    <div class="mobile-bottom-nav d-md-none">
+        <button class="mobile-nav-btn active" data-bs-toggle="tab" data-bs-target="#expenses-tab">
+            <i class="bi bi-receipt"></i>
+            <span>Expenses</span>
+        </button>
+        <button class="mobile-nav-btn" data-bs-toggle="tab" data-bs-target="#balances-tab">
+            <i class="bi bi-bar-chart"></i>
+            <span>Balances</span>
+        </button>
+        {% if not group.is_expired and not group.is_settled %}
+            <a href="{{ url_for('main.add_expense', share_token=group.share_token) }}" class="mobile-nav-btn mobile-nav-add">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add</span>
+            </a>
+        {% else %}
+            <div class="mobile-nav-btn mobile-nav-disabled">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add</span>
+            </div>
+        {% endif %}
+        <button class="mobile-nav-btn" data-bs-toggle="tab" data-bs-target="#participants-tab">
+            <i class="bi bi-people"></i>
+            <span>Participants</span>
+        </button>
+        <button class="mobile-nav-btn" data-bs-toggle="tab" data-bs-target="#history-tab">
+            <i class="bi bi-clock-history"></i>
+            <span>History</span>
+        </button>
+    </div>
+</div>
+
+<!-- Share & Invite Modal -->
+<div class="modal fade" id="shareModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Share Group & Invite Members</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tab Navigation -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#share-tab" type="button" role="tab">
+                            <i class="bi bi-share me-1"></i>Share Links
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#invite-tab" type="button" role="tab">
+                            <i class="bi bi-envelope me-1"></i>Invite by Email
+                        </button>
+                    </li>
+                </ul>
+                
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Share Tab -->
+                    <div class="tab-pane fade show active" id="share-tab">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Group Token</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control font-monospace" 
+                                       value="{{ group.share_token }}" readonly id="modalToken">
+                                <button class="btn btn-outline-primary" onclick="copyModalToken()">Copy</button>
+                            </div>
+                            <div class="form-text">Share this code with people to let them join</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Share URL</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" 
+                                       value="{{ request.host_url }}join/{{ group.share_token }}" readonly id="modalUrl">
+                                <button class="btn btn-outline-primary" onclick="copyModalUrl()">Copy</button>
+                            </div>
+                            <div class="form-text">Direct link to join the group</div>
+                        </div>
+                        
+                        {% if participant and participant.id != 'admin' and participant.id != 'viewer' %}
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Your Personal Access Link</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" 
+                                       value="{{ request.host_url }}p/{{ participant.access_token }}" readonly id="personalAccessUrl">
+                                <button class="btn btn-outline-success" onclick="copyPersonalAccessUrl()">Copy</button>
+                            </div>
+                            <div class="form-text">
+                                <i class="bi bi-person-check me-1"></i>Your unique link - gives you direct access without entering your name
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Personalized Invite Link</label>
+                            <div class="input-group">
+                                <input type="email" class="form-control" id="personalizeEmail" 
+                                       placeholder="Enter email to create personalized link">
+                                <button class="btn btn-outline-primary" onclick="generatePersonalizedLink()">Generate</button>
+                            </div>
+                            <div class="form-text">Creates a link that auto-fills the email when they join</div>
+                            <div id="personalizedLinkResult" class="mt-2" style="display: none;">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" readonly id="personalizedUrl">
+                                    <button class="btn btn-outline-success" onclick="copyPersonalizedUrl()">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Invite Tab -->
+                    <div class="tab-pane fade" id="invite-tab" role="tabpanel">
+                        <form id="inviteForm">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Participant Name</label>
+                                <input type="text" class="form-control" id="inviteName"
+                                       placeholder="John Doe" required>
+                                <div class="form-text">Name of the person you're inviting</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Email Address</label>
+                                <input type="email" class="form-control" id="inviteEmail"
+                                       placeholder="friend@example.com" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Personal Message (Optional)</label>
+                                <textarea class="form-control" id="inviteMessage" rows="3"
+                                          placeholder="Hi! I'd like to invite you to join our expense group..."></textarea>
+                            </div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send me-2"></i>Send Invitation
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Utility function to switch tabs (avoids code duplication)
+function switchToTab(targetTabId) {
+    // Remove active class from all main page tabs and content (not modal tabs)
+    document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.nav-tabs:not(.modal .nav-tabs) .nav-link').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-content:not(.modal .tab-content) .tab-pane').forEach(pane => {
+        pane.classList.remove('active', 'show');
+    });
+    
+    // Activate the target tab
+    const tabContent = document.querySelector(`#${targetTabId}`);
+    const desktopTab = document.querySelector(`.nav-link[data-bs-target="#${targetTabId}"]`);
+    const mobileNavBtn = document.querySelector(`.mobile-nav-btn[data-bs-target="#${targetTabId}"]`);
+    
+    if (tabContent) tabContent.classList.add('active', 'show');
+    if (desktopTab) desktopTab.classList.add('active');
+    if (mobileNavBtn) mobileNavBtn.classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for delete expense buttons
+    document.querySelectorAll('.delete-expense-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const expenseId = this.getAttribute('data-expense-id');
+            const expenseTitle = this.getAttribute('data-expense-title');
+            confirmDeleteExpense(expenseId, expenseTitle);
+        });
+    });
+    
+    // Add event listeners for remove participant buttons
+    document.querySelectorAll('.remove-participant-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const participantId = this.getAttribute('data-participant-id');
+            const participantName = this.getAttribute('data-participant-name');
+            confirmRemoveParticipant(participantId, participantName);
+        });
+    });
+
+    // Add event listeners for edit participant buttons
+    document.querySelectorAll('.edit-participant-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const participantId = this.getAttribute('data-participant-id');
+            const participantName = this.getAttribute('data-participant-name');
+            const participantEmail = this.getAttribute('data-participant-email');
+            openEditParticipantModal(participantId, participantName, participantEmail);
+        });
+    });
+
+    // Add event listener for add participant button
+    const addParticipantBtn = document.getElementById('addParticipantBtn');
+    if (addParticipantBtn) {
+        addParticipantBtn.addEventListener('click', function() {
+            const modal = new bootstrap.Modal(document.getElementById('addParticipantModal'));
+            modal.show();
+        });
+    }
+    
+    // Mobile bottom navigation functionality
+    document.querySelectorAll('.mobile-nav-btn[data-bs-toggle="tab"]').forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('data-bs-target').substring(1); // Remove # prefix
+            switchToTab(targetId);
+        });
+    });
+});
+
+function shareGroup() {
+    const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+    modal.show();
+}
+
+// Consolidated copy-to-clipboard function
+function copyToClipboard(inputId, button) {
+    const input = document.getElementById(inputId);
+    const btn = button || event.target;
+    
+    navigator.clipboard.writeText(input.value).then(() => {
+        const originalText = btn.textContent;
+        const originalClasses = btn.className;
+        
+        // Show feedback
+        btn.textContent = 'Copied!';
+        btn.classList.remove('btn-outline-primary', 'btn-outline-success');
+        btn.classList.add('btn-success');
+        
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.className = originalClasses;
+        }, 2000);
+    });
+}
+
+// Wrapper functions for backward compatibility
+function copyModalToken() { copyToClipboard('modalToken'); }
+function copyModalUrl() { copyToClipboard('modalUrl'); }
+function copyPersonalAccessUrl() { copyToClipboard('personalAccessUrl'); }
+
+// Generate personalized invite link
+function generatePersonalizedLink() {
+    const email = document.getElementById('personalizeEmail').value.trim();
+    if (!email) {
+        alert('Please enter an email address');
+        return;
+    }
+    
+    const container = document.querySelector('.container.py-4');
+    const baseUrl = container.getAttribute('data-base-url') + 'join/' + container.getAttribute('data-share-token');
+    const personalizedUrl = `${baseUrl}?email=${encodeURIComponent(email)}`;
+    
+    document.getElementById('personalizedUrl').value = personalizedUrl;
+    document.getElementById('personalizedLinkResult').style.display = 'block';
+}
+
+function copyPersonalizedUrl() { copyToClipboard('personalizedUrl'); }
+
+// Handle invite form submission
+document.getElementById('inviteForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const name = document.getElementById('inviteName').value;
+    const email = document.getElementById('inviteEmail').value;
+    const message = document.getElementById('inviteMessage').value;
+    const submitBtn = this.querySelector('button[type="submit"]');
+
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Sending...';
+
+    // Send invite via fetch
+    fetch(`{{ url_for('main.invite_member', share_token=group.share_token) }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            'csrf_token': '{{ csrf_token() }}',
+            'name': name,
+            'email': email,
+            'message': message
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            // Success - show feedback and reset form
+            submitBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Sent!';
+            submitBtn.classList.add('btn-success');
+            submitBtn.classList.remove('btn-primary');
+
+            // Reset form
+            document.getElementById('inviteName').value = '';
+            document.getElementById('inviteEmail').value = '';
+            document.getElementById('inviteMessage').value = '';
+
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send me-2"></i>Send Invitation';
+                submitBtn.classList.remove('btn-success');
+                submitBtn.classList.add('btn-primary');
+            }, 3000);
+        } else {
+            throw new Error('Failed to send invitation');
+        }
+    })
+    .catch(error => {
+        // Error state
+        submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Failed';
+        submitBtn.classList.add('btn-danger');
+        submitBtn.classList.remove('btn-primary');
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-send me-2"></i>Send Invitation';
+            submitBtn.classList.remove('btn-danger');
+            submitBtn.classList.add('btn-primary');
+        }, 3000);
+    });
+});
+
+// Settle group function
+function showSettleOnlyModal() {
+    const modal = new bootstrap.Modal(document.getElementById('settleOnlyModal'));
+    modal.show();
+}
+
+function showSettleAndCloseModal() {
+    const modal = new bootstrap.Modal(document.getElementById('settleAndCloseModal'));
+    modal.show();
+}
+
+function showDeleteModal() {
+    const modal = new bootstrap.Modal(document.getElementById('deleteGroupModal'));
+    modal.show();
+    
+    // Reset the confirmation input and disable button
+    document.getElementById('confirmGroupNameGroup').value = '';
+    document.getElementById('confirmDeleteBtnGroup').disabled = true;
+}
+
+function showReopenModal() {
+    const modal = new bootstrap.Modal(document.getElementById('reopenGroupModal'));
+    modal.show();
+}
+
+function showRemoveExpirationModal() {
+    const modal = new bootstrap.Modal(document.getElementById('removeExpirationModal'));
+    modal.show();
+}
+
+// Delete expense confirmation
+function confirmDeleteExpense(expenseId, expenseTitle) {
+    document.getElementById('deleteExpenseTitle').textContent = expenseTitle;
+    const container = document.querySelector('.container.py-4');
+    const shareToken = container.getAttribute('data-share-token');
+    document.getElementById('deleteExpenseForm').action = `/group/${shareToken}/delete-expense/${expenseId}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('deleteExpenseModal'));
+    modal.show();
+}
+
+// Remove participant confirmation
+function confirmRemoveParticipant(participantId, participantName) {
+    document.getElementById('removeParticipantName').textContent = participantName;
+    const container = document.querySelector('.container.py-4');
+    const shareToken = container.getAttribute('data-share-token');
+    document.getElementById('removeParticipantForm').action = `/group/${shareToken}/remove-participant/${participantId}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('removeParticipantModal'));
+    modal.show();
+}
+
+// Edit participant modal
+function openEditParticipantModal(participantId, participantName, participantEmail) {
+    document.getElementById('editParticipantName').value = participantName;
+    document.getElementById('editParticipantEmail').value = participantEmail || '';
+    
+    const container = document.querySelector('.container.py-4');
+    const shareToken = container.getAttribute('data-share-token');
+    document.getElementById('editParticipantForm').action = `/group/${shareToken}/edit-participant/${participantId}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editParticipantModal'));
+    modal.show();
+}
+
+// Submit currency form with current tab preserved
+function submitCurrencyForm() {
+    const form = document.getElementById('currencyForm');
+    
+    // Find the currently active tab
+    const activeTab = document.querySelector('.nav-link.active[data-bs-target]');
+    if (activeTab) {
+        const tabTarget = activeTab.getAttribute('data-bs-target');
+        // Add tab parameter to form
+        const tabInput = document.createElement('input');
+        tabInput.type = 'hidden';
+        tabInput.name = 'tab';
+        tabInput.value = tabTarget.substring(1); // Remove the # prefix
+        form.appendChild(tabInput);
+    }
+    
+    form.submit();
+}
+
+// Restore active tab on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeTabId = urlParams.get('tab');
+    
+    if (activeTabId) {
+        // Activate the specified tab using the utility function
+        switchToTab(activeTabId);
+    }
+    
+    // Enable delete button only when group name is correctly typed (for group delete modal)
+    const confirmInputGroup = document.getElementById('confirmGroupNameGroup');
+    const deleteBtnGroup = document.getElementById('confirmDeleteBtnGroup');
+
+    if (confirmInputGroup && deleteBtnGroup) {
+        const groupName = confirmInputGroup.getAttribute('placeholder').replace('Enter group name exactly: ', '');
+        confirmInputGroup.addEventListener('input', function() {
+            deleteBtnGroup.disabled = confirmInputGroup.value !== groupName;
+        });
+    }
+
+    // Add loading states to settlement forms in group page
+    const groupSettleForm = document.getElementById('groupSettleForm');
+    const groupSettleBtn = document.getElementById('groupSettleBtn');
+    const groupSettleCancelBtn = document.getElementById('groupSettleCancelBtn');
+
+    if (groupSettleForm && groupSettleBtn) {
+        groupSettleForm.addEventListener('submit', function() {
+            groupSettleBtn.disabled = true;
+            if (groupSettleCancelBtn) groupSettleCancelBtn.disabled = true;
+            groupSettleBtn.querySelector('.btn-text').classList.add('d-none');
+            groupSettleBtn.querySelector('.btn-loading').classList.remove('d-none');
+        });
+    }
+
+    const groupSettleOnlyForm = document.getElementById('groupSettleOnlyForm');
+    const groupSettleOnlyBtn = document.getElementById('groupSettleOnlyBtn');
+    const groupSettleOnlyCancelBtn = document.getElementById('groupSettleOnlyCancelBtn');
+
+    if (groupSettleOnlyForm && groupSettleOnlyBtn) {
+        groupSettleOnlyForm.addEventListener('submit', function() {
+            groupSettleOnlyBtn.disabled = true;
+            if (groupSettleOnlyCancelBtn) groupSettleOnlyCancelBtn.disabled = true;
+            groupSettleOnlyBtn.querySelector('.btn-text').classList.add('d-none');
+            groupSettleOnlyBtn.querySelector('.btn-loading').classList.remove('d-none');
+        });
+    }
+    
+    // Initialize real-time connection for this group
+    if (window.splittchenRealtime) {
+        const shareToken = '{{ group.share_token }}';
+        // eslint-disable-next-line
+        const isAdmin = {{ is_admin|tojson }};
+        
+        window.splittchenRealtime.init(shareToken, isAdmin);
+        
+        // Enable notification permission request on first user interaction
+        let permissionRequested = localStorage.getItem('notification_permission_requested') === 'true';
+        if (!permissionRequested) {
+            const requestNotificationPermission = async () => {
+                if (window.splittchenRealtime.notifications.permission === 'default') {
+                    const granted = await window.splittchenRealtime.notifications.requestPermissionOnInteraction();
+                    if (granted) {
+                        // Notifications enabled for Splittchen updates
+                    }
+                    localStorage.setItem('notification_permission_requested', 'true');
+                }
+                
+                // Remove event listeners after first request
+                document.removeEventListener('click', requestNotificationPermission);
+                document.removeEventListener('touch', requestNotificationPermission);
+            };
+            
+            // Request permission on first user interaction
+            document.addEventListener('click', requestNotificationPermission, { once: true });
+            document.addEventListener('touch', requestNotificationPermission, { once: true });
+        }
+    }
+});
+
+</script>
+
+<!-- Settlement Modals -->
+<!-- Settle Only Modal -->
+<div class="modal fade" id="settleOnlyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Settle Current Balances</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Settle current balances without closing the group?</strong></p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Clear current balances for all participants</li>
+                    <li>Archive current expenses to history</li>
+                    <li>Send settlement reports via email to all participants</li>
+                    <li>Keep the group open for new expenses</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Perfect for recurring bills:</strong> Participants can settle up monthly and continue adding expenses for the next period.
+                </div>
+                <div class="alert alert-warning small">
+                    <i class="bi bi-clock me-1"></i>
+                    Sending settlement emails may take several seconds. Please wait for confirmation.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="groupSettleOnlyCancelBtn">Cancel</button>
+                <form method="POST" action="{{ url_for('main.settle_only_group', share_token=group.share_token) }}" style="display: inline;" id="groupSettleOnlyForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-primary" id="groupSettleOnlyBtn">
+                        <span class="btn-text">
+                            <i class="bi bi-calculator me-2"></i>Yes, Settle
+                        </span>
+                        <span class="btn-loading d-none">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Sending emails...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settle and Close Modal -->
+<div class="modal fade" id="settleAndCloseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Settle & Close Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to settle and close this group?</strong></p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Clear final balances for all participants</li>
+                    <li>Archive current expenses to history</li>
+                    <li>Send final settlement reports via email to all participants</li>
+                    <li><strong>Close the group</strong> (no more expenses can be added)</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> You can reopen this group later if needed. Closed groups can be reopened by administrators.
+                </div>
+                <div class="alert alert-warning small">
+                    <i class="bi bi-clock me-1"></i>
+                    Sending settlement emails may take several seconds. Please wait for confirmation.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="groupSettleCancelBtn">Cancel</button>
+                <form method="POST" action="{{ url_for('main.settle_group', share_token=group.share_token) }}" style="display: inline;" id="groupSettleForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger" id="groupSettleBtn">
+                        <span class="btn-text">
+                            <i class="bi bi-check-circle me-2"></i>Yes, Settle & Close
+                        </span>
+                        <span class="btn-loading d-none">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Settling and sending emails...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Expense Modal -->
+<div class="modal fade" id="deleteExpenseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Expense</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to delete this expense?</strong></p>
+                <p>Expense: <span id="deleteExpenseTitle" class="fw-bold"></span></p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone! The expense and all its splits will be permanently removed.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteExpenseForm" method="POST" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-2"></i>Yes, Delete Expense
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Participant Modal -->
+<div class="modal fade" id="removeParticipantModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Remove Participant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to remove this participant?</strong></p>
+                <p>Participant: <span id="removeParticipantName" class="fw-bold"></span></p>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>How expenses are handled:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>If they have outstanding balances, removal will be blocked</li>
+                        <li>Any expenses they paid for will be transferred to another participant</li>
+                        <li>Their splits from other expenses will be removed</li>
+                        <li>All changes will be logged in the group history</li>
+                    </ul>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone!
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="removeParticipantForm" method="POST" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-person-dash me-2"></i>Yes, Remove Participant
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Participant Modal -->
+<div class="modal fade" id="editParticipantModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Participant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editParticipantForm" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="mb-3">
+                        <label for="editParticipantName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="editParticipantName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editParticipantEmail" class="form-label">Email (optional)</label>
+                        <input type="email" class="form-control" id="editParticipantEmail" name="email">
+                        <small class="form-text text-muted">Email is used for settlement notifications and invitations.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="editParticipantForm" class="btn btn-primary">
+                    <i class="bi bi-check me-2"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Participant Modal -->
+<div class="modal fade" id="addParticipantModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Participant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addParticipantForm" method="POST" action="{{ url_for('main.invite_member', share_token=group.share_token) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="mb-3">
+                        <label for="addParticipantName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="addParticipantName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addParticipantEmail" class="form-label">Email (optional)</label>
+                        <input type="email" class="form-control" id="addParticipantEmail" name="email">
+                        <small class="form-text text-muted">Email is used for invitations and settlement notifications. If provided, an invitation will be sent.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addParticipantForm" class="btn btn-primary">
+                    <i class="bi bi-person-plus me-2"></i>Add Participant
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reopen Group Modal -->
+<div class="modal fade" id="reopenGroupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reopen Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to reopen this {% if group.is_expired %}expired{% else %}settled{% endif %} group?</strong></p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Unlock the group to allow new expenses</li>
+                    <li>Allow participants to add more expenses</li>
+                    {% if group.is_expired %}
+                    <li><strong>Remove the expiration date</strong> (convert to normal group)</li>
+                    {% endif %}
+                    <li>Reset the settled status (group can be settled again later)</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> {% if group.is_expired %}Reopening an expired group will remove its expiration date and convert it to a normal group. {% endif %}Previously sent settlement reports will remain valid for the existing balances. New expenses will change the balances and may require a new settlement.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('main.reopen_group', share_token=group.share_token) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-unlock me-2"></i>Yes, Reopen Group
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Expiration Modal -->
+<div class="modal fade" id="removeExpirationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Remove Expiration Date</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to remove the expiration date from this group?</strong></p>
+                {% if group.expires_at %}
+                    <p>This group is currently set to expire on <strong>{{ group.expires_at.strftime('%d.%m.%Y') }}</strong>.</p>
+                {% endif %}
+                <p>Removing the expiration date will:</p>
+                <ul>
+                    <li>Convert this group to a normal (non-expiring) group</li>
+                    <li>Prevent automatic settlement and closure on the expiration date</li>
+                    <li>Allow the group to remain active indefinitely</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> You can always set a new expiration date later if needed, or use the settlement options to close the group manually.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('main.remove_expiration_date', share_token=group.share_token) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-calendar-x me-2"></i>Yes, Remove Expiration Date
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Group Modal -->
+<div class="modal fade" id="deleteGroupModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Delete Group Permanently
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>CRITICAL WARNING:</strong> This action is permanent and cannot be undone!
+                </div>
+                
+                <p><strong>You are about to permanently delete "{{ group.name }}" and ALL associated data.</strong></p>
+                
+                <p>This will delete:</p>
+                <ul>
+                    <li><strong>All expenses</strong> with all payment records</li>
+                    <li><strong>All participants</strong> and their information</li>
+                    <li><strong>All expense shares</strong> and balance calculations</li>
+                    <li><strong>All audit logs</strong> and activity history</li>
+                    <li><strong>All settlement periods</strong> (if any)</li>
+                    <li><strong>The group itself</strong> including share links</li>
+                </ul>
+                
+                <div class="alert alert-warning">
+                    <i class="bi bi-shield-exclamation me-2"></i>
+                    <strong>Before you proceed:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Make sure all participants have settled their balances</li>
+                        <li>Consider downloading/saving any important expense data</li>
+                        <li>Inform participants that the group will be deleted</li>
+                    </ul>
+                </div>
+                
+                <p class="mb-0"><strong>Type the group name to confirm deletion:</strong></p>
+                <input type="text" class="form-control mt-2" id="confirmGroupNameGroup" placeholder="Enter group name exactly: {{ group.name }}">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </button>
+                <form method="POST" action="{{ url_for('main.delete_group', share_token=group.share_token) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger" id="confirmDeleteBtnGroup" disabled>
+                        <i class="bi bi-trash me-2"></i>Yes, Delete Group Permanently
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline-icon {
+    width: 24px;
+    min-width: 24px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 1.2rem;
+}
+
+.timeline-item:last-child {
+    border-bottom: none !important;
+}
+
+.timeline-content {
+    min-height: 30px;
+    overflow: hidden;
+}
+
+.timeline-item > .d-flex {
+    overflow: hidden;
+}
+
+/* Mobile Bottom Navigation */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    height: 70px;
+    z-index: 1000;
+    box-shadow: var(--shadow);
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 767.98px) {
+    /* Add bottom padding on mobile to account for fixed navigation */
+    .tab-content {
+        padding-bottom: 100px !important;
+    }
+
+    /* Prevent horizontal scrolling */
+    body {
+        overflow-x: hidden !important;
+    }
+
+    .container {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        overflow-x: hidden;
+    }
+
+    .card {
+        overflow-x: hidden;
+    }
+
+    .card-body {
+        padding: 1rem 0.75rem !important;
+    }
+
+    /* Timeline specific fixes */
+    .timeline-item {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    .timeline-content {
+        max-width: 100%;
+        overflow-x: hidden;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .timeline-content small {
+        word-break: break-word;
+        max-width: 100%;
+    }
+
+    /* Ensure history details don't overflow */
+    .history-details {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .history-details span {
+        max-width: 100%;
+        word-break: break-word;
+    }
+
+    /* Fix for d-flex containers on mobile */
+    .d-flex {
+        max-width: 100%;
+    }
+}
+
+.mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 8px 4px;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    min-height: 44px;
+    position: relative;
+}
+
+.mobile-nav-btn:hover,
+.mobile-nav-btn:focus {
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.mobile-nav-btn.active {
+    color: var(--primary-green);
+}
+
+.mobile-nav-btn.mobile-nav-add {
+    background: none;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.mobile-nav-btn.mobile-nav-add:hover,
+.mobile-nav-btn.mobile-nav-add:focus {
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.mobile-nav-btn.mobile-nav-disabled {
+    background: none;
+    color: var(--text-muted);
+    cursor: not-allowed;
+    flex: 1;
+}
+
+.mobile-nav-btn i {
+    font-size: 20px;
+    margin-bottom: 2px;
+}
+
+.mobile-nav-btn span {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+}
+
+/* Hide desktop tabs on mobile and add bottom padding to content when mobile nav is visible */
+@media (max-width: 767.98px) {
+    .desktop-tabs {
+        display: none !important;
+    }
+    
+    .container.py-4 {
+        padding-bottom: 90px !important;
+    }
+}
+
+/* Ensure body doesn't scroll behind the nav */
+body {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+</style>
+
+{% endblock %}

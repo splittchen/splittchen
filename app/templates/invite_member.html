@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Invite Member - {{ group.name }} - Splittchen{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="{{ url_for('main.view_group', share_token=group.share_token) }}">{{ group.name }}</a>
+                    </li>
+                    <li class="breadcrumb-item active">Invite Member</li>
+                </ol>
+            </nav>
+            
+            <!-- Form Card -->
+            <div class="card">
+                <div class="card-header card-header-gradient">
+                    <h4 class="mb-0">
+                        <i class="bi bi-envelope me-2"></i>Invite by Email
+                    </h4>
+                </div>
+                
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Sending from:</strong> {{ participant.name }}<br>
+                        <strong>Group:</strong> {{ group.name }}
+                    </div>
+                    
+                    <!-- Display form errors (including CSRF) -->
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <strong>Form Errors:</strong>
+                            <ul class="mb-0">
+                                {% for field_name, field_errors in form.errors.items() %}
+                                    {% for error in field_errors %}
+                                        <li>{{ field_name }}: {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                    
+                    <form method="POST" novalidate id="inviteForm">
+                        {{ form.hidden_tag() }}
+
+                        <div class="mb-3">
+                            {{ form.email.label(class="form-label fw-semibold") }}
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-envelope"></i>
+                                </span>
+                                {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""),
+                                             placeholder="friend@example.com") }}
+                            </div>
+                            {% if form.email.errors %}
+                                <div class="invalid-feedback">{{ form.email.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4">
+                            {{ form.message.label(class="form-label fw-semibold") }}
+                            {{ form.message(class="form-control",
+                                           id="message",
+                                           placeholder="Add a personal message to your invitation...",
+                                           rows="4") }}
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                This message will be included in the invitation email
+                            </div>
+                        </div>
+                        
+                        <!-- Preview -->
+                        <div class="card mb-4" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="bi bi-eye me-2"></i>Email Preview
+                                </h6>
+                                <div class="small">
+                                    <strong>Subject:</strong> Join "{{ group.name }}" on Splittchen<br>
+                                    <strong>From:</strong> {{ config.FROM_EMAIL }}<br><br>
+                                    
+                                    <div class="border-start border-primary ps-3">
+                                        <p class="mb-2"><strong>{{ participant.name }} has invited you to join their expense group on Splittchen.</strong></p>
+                                        <div id="message-preview" class="text-muted fst-italic mb-2"></div>
+                                        <p class="mb-2">
+                                            <strong>Group:</strong> {{ group.name }}<br>
+                                            <strong>Code:</strong> {{ group.share_token }}
+                                        </p>
+                                        <p class="mb-0">The email will include a direct join link.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Email delivery may take a few seconds. Please wait for confirmation.
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary-green btn-lg" id="submitBtn">
+                                <span class="btn-text">
+                                    <i class="bi bi-send me-2"></i>Send Invitation
+                                </span>
+                                <span class="btn-loading d-none">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Sending email...
+                                </span>
+                            </button>
+                            <a href="{{ url_for('main.view_group', share_token=group.share_token) }}"
+                               class="btn btn-outline-secondary" id="backBtn">
+                                <i class="bi bi-arrow-left me-2"></i>Back to Group
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Alternative Sharing -->
+            <div class="card mt-4 border-secondary">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-share me-2"></i>Alternative Sharing Methods
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Group Code</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control font-monospace" 
+                                   value="{{ group.share_token }}" readonly id="groupCode">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="copyCode()">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold">Direct Link</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control small" 
+                                   value="{{ request.host_url }}join/{{ group.share_token }}" readonly id="directLink">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="copyLink()">
+                                <i class="bi bi-link-45deg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Update message preview
+document.addEventListener('DOMContentLoaded', function() {
+    const messageField = document.getElementById('message');
+    if (messageField) {
+        messageField.addEventListener('input', function() {
+            const preview = document.getElementById('message-preview');
+            if (this.value.trim()) {
+                preview.textContent = '"' + this.value + '"';
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        });
+    }
+
+    // Add form submission handler to show loading state
+    const form = document.getElementById('inviteForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const backBtn = document.getElementById('backBtn');
+
+    if (form && submitBtn) {
+        form.addEventListener('submit', function(e) {
+            // Disable button and show loading state
+            submitBtn.disabled = true;
+            backBtn.classList.add('disabled');
+            submitBtn.querySelector('.btn-text').classList.add('d-none');
+            submitBtn.querySelector('.btn-loading').classList.remove('d-none');
+        });
+    }
+});
+
+function copyCode() {
+    const input = document.getElementById('groupCode');
+    navigator.clipboard.writeText(input.value);
+}
+
+function copyLink() {
+    const input = document.getElementById('directLink');
+    navigator.clipboard.writeText(input.value);
+}
+</script>
+{% endblock %}

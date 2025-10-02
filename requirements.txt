@@ -1,0 +1,32 @@
+# Core Flask application
+Flask>=3.1.2,<4.0.0
+Flask-SQLAlchemy>=3.1.1,<4.0.0
+Flask-WTF>=1.2.2,<2.0.0
+WTForms>=3.2.1,<4.0.0
+
+# Database
+SQLAlchemy>=2.0.43,<3.0.0
+
+# Email functionality
+email-validator>=2.2.0,<3.0.0
+
+# HTTP requests for currency API
+requests>=2.32.5,<3.0.0
+
+# Configuration
+python-dotenv>=1.1.1,<2.0.0
+
+# Production server
+gunicorn>=23.0.0,<24.0.0
+
+# PostgreSQL adapter
+psycopg2-binary>=2.9.9,<3.0.0
+
+# Background task scheduling
+APScheduler>=3.11.0,<4.0.0
+
+# Real-time WebSocket support
+Flask-SocketIO>=5.3.6,<6.0.0
+python-socketio>=5.11.0,<6.0.0
+gevent>=24.2.1,<26.0.0
+gevent-websocket>=0.10.1,<1.0.0

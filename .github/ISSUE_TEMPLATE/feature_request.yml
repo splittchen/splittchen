@@ -1,0 +1,104 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest in improving Splittchen! Please describe your feature idea below.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve? What use case does it address?
+      placeholder: |
+        I'm frustrated when...
+        It would be helpful if...
+        Currently, users have to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: |
+        I would like to see...
+        The feature should work like...
+        Users should be able to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Are there alternative approaches or workarounds you've considered?
+      placeholder: |
+        Alternatively, we could...
+        Another approach might be...
+        Current workaround is...
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - "Low - Nice to have"
+        - "Medium - Would be helpful"
+        - "High - Important for my use case"
+        - "Critical - Blocking my usage"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: feature-area
+    attributes:
+      label: Feature Area
+      description: Which areas of the application would this feature affect?
+      options:
+        - label: User Interface / UX
+        - label: Group Management
+        - label: Expense Splitting
+        - label: Email Notifications
+        - label: Currency/Internationalization
+        - label: Mobile Experience
+        - label: Admin/Settings
+        - label: Performance
+        - label: Security
+        - label: API/Integrations
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Implementation Complexity (Your Estimate)
+      description: How complex do you think this feature would be to implement?
+      options:
+        - "Simple - Small UI change or config option"
+        - "Medium - New feature requiring some backend work"
+        - "Complex - Major feature requiring significant changes"
+        - "Unknown - Not sure about the complexity"
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or Mockups
+      description: |
+        Any examples from other applications, mockups, or detailed descriptions of how this should work?
+      placeholder: |
+        Similar to how [app] does...
+        Here's a mockup: [attach image]
+        Step-by-step workflow: ...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or information about the feature request
+      placeholder: |
+        This would be especially useful for...
+        Related to issue #...
+        Here are some similar features in other apps...
