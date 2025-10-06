@@ -28,6 +28,14 @@ RUN pip install --upgrade pip && \
 # Production stage - minimal runtime image
 FROM python:3.13.7-slim AS production
 
+# OCI Labels for proper package metadata
+LABEL org.opencontainers.image.title="Splittchen"
+LABEL org.opencontainers.image.description="Privacy-first expense splitting app"
+LABEL org.opencontainers.image.url="https://github.com/splittchen/splittchen"
+LABEL org.opencontainers.image.source="https://github.com/splittchen/splittchen"
+LABEL org.opencontainers.image.documentation="https://github.com/splittchen/splittchen/blob/main/README.md"
+LABEL org.opencontainers.image.licenses="MIT"
+
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
