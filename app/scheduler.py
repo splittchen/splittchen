@@ -107,7 +107,7 @@ def check_and_process_settlements():
         from app import create_app
 
         # Create application context for database operations
-        app = create_app()
+        app, _ = create_app()  # Unpack tuple (app, socketio)
         with app.app_context():
             today = datetime.now(timezone.utc)
             logger.info(f"Current UTC time: {today.isoformat()}")
@@ -226,7 +226,7 @@ def check_and_send_settlement_reminders():
         from datetime import timedelta
         
         # Create application context for database operations
-        app = create_app()
+        app, _ = create_app()  # Unpack tuple (app, socketio)
         with app.app_context():
             today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             three_days_from_now = today + timedelta(days=3)
