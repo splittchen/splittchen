@@ -145,7 +145,6 @@ data/
 postgres/
 
 # Build and deployment scripts
-build.ps1
 build.sh
 *.py1
 
@@ -203,5 +202,6 @@ Thumbs.db
 
 # Platform-specific deployment files (if they exist)
 docker-compose_local.yml
-*.ps1
+create-signed-commit.ps1
+init-local-repo.ps1
 .docker-config

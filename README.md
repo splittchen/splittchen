@@ -35,6 +35,8 @@ docker-compose logs -f web
 
 Access your application at: **http://localhost:5000**
 
+**Multi-Architecture Support:** Docker images are available for `linux/amd64` and `linux/arm64` platforms. Docker automatically pulls the correct architecture for your system. See [MULTIARCH.md](MULTIARCH.md) for details or [MULTIARCH-QUICKREF.md](MULTIARCH-QUICKREF.md) for quick commands.
+
 ### Docker User Configuration
 
 Configure user permissions in your `.env` file:
@@ -121,6 +123,18 @@ DATA_PATH=./data
 ```
 
 ## Production Deployment
+
+### Multi-Architecture Docker Images
+Splittchen provides official multi-architecture Docker images supporting:
+- **linux/amd64** - x86_64 (Intel/AMD processors, servers, cloud)
+- **linux/arm64** - ARM 64-bit (Apple Silicon, AWS Graviton, Raspberry Pi 4/5)
+
+Docker automatically selects the correct architecture when pulling:
+```bash
+docker pull ghcr.io/splittchen/splittchen:latest
+```
+
+**Build your own:** See [MULTIARCH.md](MULTIARCH.md) for complete guide or [MULTIARCH-QUICKREF.md](MULTIARCH-QUICKREF.md) for quick commands.
 
 ### Security Features
 ✅ **Enterprise-grade security implemented:**
