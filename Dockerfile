@@ -1,7 +1,7 @@
 # Multi-stage production Dockerfile for Splittchen
 
 # Build stage - includes build tools and dependencies
-FROM python:3.13.7-slim AS builder
+FROM python:3.14.0-slim AS builder
 
 # Set environment variables for build stage
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -26,7 +26,7 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Production stage - minimal runtime image
-FROM python:3.13.7-slim AS production
+FROM python:3.14.0-slim AS production
 
 # OCI Labels for proper package metadata
 LABEL org.opencontainers.image.title="Splittchen"
