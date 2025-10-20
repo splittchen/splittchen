@@ -299,7 +299,40 @@ class Participant(db.Model):
         except Exception as e:
             current_app.logger.warning(f"Failed to update last_accessed for participant {self.id}: {e}")
             db.session.rollback()
-    
+
+    def can_exit_group(self) -> tuple[bool, str]:
+        """
+        Check if participant can exit the group.
+
+        Returns:
+            tuple: (can_exit: bool, reason: str)
+        """
+        from decimal import Decimal
+
+        # Check if group is settled (can exit settled groups)
+        if self.group.is_settled:
+            return True, "OK"
+
+        # Check if this is the last participant
+        if len(self.group.participants) <= 1:
+            return False, "Cannot exit - you are the last participant in the group"
+
+        # Check if this is the only admin
+        if self.is_admin:
+            other_admins = [p for p in self.group.participants if p.is_admin and p.id != self.id]
+            if not other_admins:
+                return False, "Cannot exit - you are the only admin. Please promote another participant to admin first"
+
+        # Check for unresolved balances
+        balances = self.group.get_balances()
+        participant_balance = float(balances.get(self.id, Decimal('0.0')))
+
+        if abs(participant_balance) > 0.01:  # Has outstanding balance
+            from app.utils import format_currency
+            return False, f"Cannot exit - you have an outstanding balance of {format_currency(participant_balance, self.group.currency)}. Please settle your balance first"
+
+        return True, "OK"
+
     def __repr__(self) -> str:
         return f'<Participant {self.name}>'
 
