@@ -17,6 +17,8 @@ services:
     depends_on:
       - db
     restart: unless-stopped
+    volumes:
+      - .:/app  # Mount current directory for live code reloading
     # The container includes WebSocket support via Flask-SocketIO
     # Using Gunicorn with gevent workers for real-time features
 

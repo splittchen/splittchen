@@ -149,6 +149,7 @@ build.sh
 *.py1
 
 # AI assistant files (development only)
+.ai-memory/
 .claude/
 .cursor/
 .copilot/
