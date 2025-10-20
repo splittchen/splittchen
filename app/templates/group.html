@@ -590,30 +590,6 @@
         </div>
     </div>
 
-    <!-- Exit Group Section (only for real participants, not viewers/virtual admins) -->
-    {% if participant and participant.id is number and not group.is_settled and not group.is_expired %}
-    <div class="row mt-4 mb-3">
-        <div class="col-12">
-            <div class="card border-warning">
-                <div class="card-body">
-                    <h6 class="card-title text-warning mb-2">
-                        <i class="bi bi-box-arrow-right me-2"></i>Exit Group
-                    </h6>
-                    <p class="card-text small mb-3">
-                        You can exit this group if you have no outstanding balances.
-                        {% if participant.is_admin %}
-                        As an admin, you must ensure there is at least one other admin before exiting.
-                        {% endif %}
-                    </p>
-                    <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#exitGroupModal">
-                        <i class="bi bi-box-arrow-right me-1"></i>Exit Group
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
     <!-- Mobile Bottom Navigation (fixed at bottom) -->
     <div class="mobile-bottom-nav d-md-none">
         <button class="mobile-nav-btn active" data-bs-toggle="tab" data-bs-target="#expenses-tab">
