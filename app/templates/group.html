@@ -3,7 +3,27 @@
 {% block title %}{{ group.name }} - Splittchen{% endblock %}
 
 {% block content %}
-<div class="container py-4" 
+<!-- DEBUG INFO - Remove after testing -->
+{% if request.args.get('debug') %}
+<div class="alert alert-info">
+    <strong>Debug Info:</strong><br>
+    Participant: {{ participant }}<br>
+    Participant ID: {{ participant.id if participant else 'None' }}<br>
+    Participant ID Type: {{ participant.id is number if participant else 'N/A' }}<br>
+    Participant Name: {{ participant.name if participant else 'None' }}<br>
+    Is Settled: {{ group.is_settled }}<br>
+    Is Expired: {{ group.is_expired }}<br>
+    Exit Button Should Show: {{ participant and participant.id is number and not group.is_settled and not group.is_expired }}<br>
+    <hr>
+    <strong>How to see exit button:</strong><br>
+    1. Join the group as a participant (not just viewing)<br>
+    2. Make sure group is not settled or expired<br>
+    3. You need a real participant ID (numeric), not 'viewer' or 'admin'<br>
+</div>
+{% endif %}
+<!-- END DEBUG INFO -->
+
+<div class="container py-4"
      data-share-token="{{ group.share_token }}"
      data-base-url="{{ request.host_url }}">
     <!-- Group Header -->
@@ -90,7 +110,7 @@
                                 <i class="bi bi-gear"></i>
                             </a>
                         {% endif %}
-                        {% if participant and not group.is_settled and not group.is_expired %}
+                        {% if participant and participant.id is number and not group.is_settled and not group.is_expired %}
                             <button class="btn btn-outline-warning d-none d-md-inline-block" data-bs-toggle="modal" data-bs-target="#exitGroupModal" title="Exit Group">
                                 <i class="bi bi-box-arrow-right"></i>
                             </button>
@@ -391,8 +411,8 @@
                     </div>
                 </div>
 
-                <!-- Exit Group Option (visible to all participants) -->
-                {% if participant and not group.is_settled and not group.is_expired %}
+                <!-- Exit Group Option (visible to real participants only, not viewers/admins) -->
+                {% if participant and participant.id is number and not group.is_settled and not group.is_expired %}
                 <div class="card border-warning mt-3">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -570,8 +590,8 @@
         </div>
     </div>
 
-    <!-- Exit Group Section (only for non-admin participants or when conditions met) -->
-    {% if participant and not group.is_settled and not group.is_expired %}
+    <!-- Exit Group Section (only for real participants, not viewers/virtual admins) -->
+    {% if participant and participant.id is number and not group.is_settled and not group.is_expired %}
     <div class="row mt-4 mb-3">
         <div class="col-12">
             <div class="card border-warning">
