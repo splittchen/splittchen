@@ -85,10 +85,15 @@
                             <i class="bi bi-share me-1"></i><span class="d-none d-lg-inline">Share & Invite</span><span class="d-lg-none">Share</span>
                         </button>
                         {% if is_admin %}
-                            <a href="{{ url_for('main.admin_panel', admin_token=group.admin_token) }}" 
+                            <a href="{{ url_for('main.admin_panel', admin_token=group.admin_token) }}"
                                class="btn btn-outline-secondary" title="Admin Panel">
                                 <i class="bi bi-gear"></i>
                             </a>
+                        {% endif %}
+                        {% if participant and not group.is_settled and not group.is_expired %}
+                            <button class="btn btn-outline-warning d-none d-md-inline-block" data-bs-toggle="modal" data-bs-target="#exitGroupModal" title="Exit Group">
+                                <i class="bi bi-box-arrow-right"></i>
+                            </button>
                         {% endif %}
                     </div>
                 </div>
@@ -385,6 +390,28 @@
                         {% endfor %}
                     </div>
                 </div>
+
+                <!-- Exit Group Option (visible to all participants) -->
+                {% if participant and not group.is_settled and not group.is_expired %}
+                <div class="card border-warning mt-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1 text-warning">
+                                    <i class="bi bi-box-arrow-right me-2"></i>Exit This Group
+                                </h6>
+                                <small class="text-muted">
+                                    Leave this group (requires zero balance)
+                                </small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#exitGroupModal">
+                                <i class="bi bi-box-arrow-right me-1"></i>Exit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
             {% else %}
                 <div class="text-center py-5">
                     <i class="bi bi-people text-muted" style="font-size: 4rem;"></i>
@@ -542,7 +569,31 @@
             {% endif %}
         </div>
     </div>
-    
+
+    <!-- Exit Group Section (only for non-admin participants or when conditions met) -->
+    {% if participant and not group.is_settled and not group.is_expired %}
+    <div class="row mt-4 mb-3">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <h6 class="card-title text-warning mb-2">
+                        <i class="bi bi-box-arrow-right me-2"></i>Exit Group
+                    </h6>
+                    <p class="card-text small mb-3">
+                        You can exit this group if you have no outstanding balances.
+                        {% if participant.is_admin %}
+                        As an admin, you must ensure there is at least one other admin before exiting.
+                        {% endif %}
+                    </p>
+                    <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#exitGroupModal">
+                        <i class="bi bi-box-arrow-right me-1"></i>Exit Group
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Mobile Bottom Navigation (fixed at bottom) -->
     <div class="mobile-bottom-nav d-md-none">
         <button class="mobile-nav-btn active" data-bs-toggle="tab" data-bs-target="#expenses-tab">
@@ -1382,6 +1433,63 @@ document.addEventListener('DOMContentLoaded', function() {
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-danger" id="confirmDeleteBtnGroup" disabled>
                         <i class="bi bi-trash me-2"></i>Yes, Delete Group Permanently
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Exit Group Modal -->
+<div class="modal fade" id="exitGroupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-box-arrow-right me-2"></i>Exit Group
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to exit "{{ group.name }}"?</strong></p>
+
+                <p>This will:</p>
+                <ul>
+                    <li>Remove you from the group</li>
+                    <li>Remove the group from your recent groups list</li>
+                    <li>Remove your email association with this group</li>
+                    <li>Transfer any expenses you paid to another participant</li>
+                </ul>
+
+                {% if participant and participant.is_admin %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> You are an admin. Make sure there's at least one other admin before exiting.
+                </div>
+                {% endif %}
+
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Requirements to exit:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>You must have no outstanding balances (must be settled up)</li>
+                        <li>There must be at least one other participant remaining</li>
+                        {% if participant and participant.is_admin %}
+                        <li>There must be at least one other admin</li>
+                        {% endif %}
+                    </ul>
+                </div>
+
+                <p class="mb-0"><strong>This action cannot be undone.</strong> You will need an invitation to rejoin.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </button>
+                <form method="POST" action="{{ url_for('main.exit_group', share_token=group.share_token) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-box-arrow-right me-2"></i>Yes, Exit Group
                     </button>
                 </form>
             </div>

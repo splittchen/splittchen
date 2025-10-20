@@ -2060,6 +2060,126 @@ def remove_participant(share_token, participant_id):
     return redirect(url_for('main.view_group', share_token=share_token))
 
 
+@main.route('/group/<share_token>/exit-group', methods=['POST'])
+def exit_group(share_token):
+    """Allow a participant to exit a group (self-removal)."""
+    current_participant, group = verify_participant_access(share_token)
+    if not current_participant:
+        return render_template('404.html'), 404
+
+    # Check if group is settled
+    if group.is_settled:
+        flash('Cannot exit a settled group.', 'error')
+        return redirect(url_for('main.view_group', share_token=share_token))
+
+    # Check if participant can exit (using model method)
+    can_exit, reason = current_participant.can_exit_group()
+    if not can_exit:
+        flash(reason, 'error')
+        return redirect(url_for('main.view_group', share_token=share_token))
+
+    try:
+        # Get participant info before deletion
+        participant_email = current_participant.email
+        participant_name = current_participant.name
+        participant_id = current_participant.id
+
+        # Remove expense shares (they should be zero-balanced at this point)
+        participant_shares = ExpenseShare.query.filter_by(participant_id=participant_id).join(Expense).filter(Expense.group_id == group.id).all()
+        for share in participant_shares:
+            db.session.delete(share)
+
+        # Transfer any expenses they paid (if any) to an admin or first remaining participant
+        participant_expenses = Expense.query.filter_by(paid_by_id=participant_id, group_id=group.id).all()
+        if participant_expenses:
+            # Find suitable participant to transfer expenses to
+            transfer_to = None
+            for p in group.participants:
+                if p.id != participant_id and p.is_admin:
+                    transfer_to = p
+                    break
+            if not transfer_to:
+                for p in group.participants:
+                    if p.id != participant_id:
+                        transfer_to = p
+                        break
+
+            if transfer_to:
+                for expense in participant_expenses:
+                    expense.paid_by_id = transfer_to.id
+
+                # Log expense transfers
+                from app.utils import log_audit_action
+                log_audit_action(
+                    group_id=group.id,
+                    action='expenses_transferred',
+                    description=f'Transferred {len(participant_expenses)} expenses from {participant_name} (self-exit) to {transfer_to.name}',
+                    performed_by=participant_name,
+                    performed_by_participant_id=participant_id,
+                    participant_id=participant_id,
+                    details={
+                        'from_participant': participant_name,
+                        'to_participant': transfer_to.name,
+                        'expense_count': len(participant_expenses),
+                        'expense_ids': [e.id for e in participant_expenses],
+                        'action_type': 'self_exit'
+                    }
+                )
+
+        # Log the exit action
+        from app.utils import log_audit_action
+        log_audit_action(
+            group_id=group.id,
+            action='participant_exited',
+            description=f'{participant_name} exited the group',
+            performed_by=participant_name,
+            performed_by_participant_id=participant_id,
+            participant_id=participant_id,
+            details={
+                'exited_participant_name': participant_name,
+                'exited_participant_email': participant_email,
+                'action_type': 'self_exit'
+            }
+        )
+
+        # Store participant data for broadcasting before deletion
+        participant_data = {
+            'id': current_participant.id,
+            'name': current_participant.name,
+            'email': current_participant.email,
+            'color': current_participant.color
+        }
+
+        # Remove the participant from the database
+        db.session.delete(current_participant)
+        db.session.commit()
+
+        # Clean up session data for this group
+        session.pop(f'participant_{share_token}', None)
+        session.pop(f'admin_participant_{share_token}', None)
+        session.pop(f'viewer_{share_token}', None)
+        session.pop(f'viewer_email_{share_token}', None)
+
+        # Remove from recent groups list
+        user_groups = session.get('user_groups', [])
+        user_groups = [g for g in user_groups if g.get('share_token') != share_token]
+        session['user_groups'] = user_groups
+
+        # Broadcast real-time update to remaining group members
+        from app.socketio_events.group_events import broadcast_participant_removed
+        broadcast_participant_removed(group.share_token, participant_data)
+
+        flash(f'You have successfully exited the group "{group.name}".', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error during group exit for participant {current_participant.id}: {e}')
+        flash('Failed to exit group. Please try again.', 'error')
+        return redirect(url_for('main.view_group', share_token=share_token))
+
+    return redirect(url_for('main.index'))
+
+
 @main.route('/group/<share_token>/edit-participant/<int:participant_id>', methods=['POST'])
 def edit_participant(share_token, participant_id):
     """Edit a participant's details."""
