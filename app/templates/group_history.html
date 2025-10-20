@@ -85,6 +85,8 @@
                                                 <i class="bi bi-person-plus text-primary"></i>
                                             {% elif log.action == 'participant_removed' %}
                                                 <i class="bi bi-person-dash text-danger"></i>
+                                            {% elif log.action == 'participant_exited' %}
+                                                <i class="bi bi-box-arrow-right text-warning"></i>
                                             {% elif log.action == 'participant_updated' %}
                                                 <i class="bi bi-person-gear text-warning"></i>
                                             {% elif log.action == 'participant_invited' %}
@@ -164,6 +166,14 @@
                                                                     {% if log.details.had_expenses %}
                                                                         | Had expenses that were transferred
                                                                     {% endif %}
+                                                                </small>
+                                                            {% elif log.action == 'participant_exited' %}
+                                                                <small class="text-muted d-block">
+                                                                    <i class="bi bi-info-circle me-1"></i>
+                                                                    {% if log.details.exited_participant_email %}
+                                                                        Email: {{ log.details.exited_participant_email }}
+                                                                    {% endif %}
+                                                                    | Self-exit
                                                                 </small>
                                                             {% elif log.action == 'participant_updated' %}
                                                                 <small class="text-muted d-block">
