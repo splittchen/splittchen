@@ -1,0 +1,31 @@
+# Docker Compose for LOCAL TESTING - Builds from current branch
+# Usage: docker-compose -f docker-compose.local.yml up --build
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: splittchen:local-dev  # Tag for local development
+    user: "${DOCKER_USER:-1000}:${DOCKER_GROUP:-1000}"
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=development
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      - db
+    restart: unless-stopped
+    # The container includes WebSocket support via Flask-SocketIO
+    # Using Gunicorn with gevent workers for real-time features
+
+  db:
+    image: postgres:17-alpine
+    env_file:
+      - .env
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ${DATA_PATH:-./data}/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
