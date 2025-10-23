@@ -104,6 +104,11 @@
                             <button type="submit" class="btn btn-success btn-lg">
                                 <i class="bi bi-person-plus me-2"></i>Join
                             </button>
+                            {% if not group.is_settled %}
+                            <a href="{{ url_for('main.skip_join_existing', share_token=share_token) }}" class="btn btn-outline-primary">
+                                <i class="bi bi-arrow-right-circle me-2"></i>I'm Already a Member
+                            </a>
+                            {% endif %}
                             <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-left me-2"></i>Back to Home
                             </a>
