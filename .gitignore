@@ -206,3 +206,5 @@ docker-compose_local.yml
 create-signed-commit.ps1
 init-local-repo.ps1
 .docker-config
+.serena/
+.vscode/
