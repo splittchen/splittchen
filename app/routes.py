@@ -309,6 +309,67 @@ def join_group_direct(share_token: str) -> Any:
     return render_template('join_group.html', group=group, share_token=share_token, form=form, invite_email=invite_email)
 
 
+@main.route('/join/<share_token>/skip', methods=['GET', 'POST'])
+def skip_join_existing(share_token: str) -> Any:
+    """Skip new participant creation and select existing participant."""
+    group = Group.query.filter_by(share_token=share_token, is_active=True).first()
+    
+    if not group:
+        flash('Group not found or no longer active.', 'error')
+        return redirect(url_for('main.index'))
+    
+    if group.is_expired or not group.is_active:
+        abort(410)
+    
+    # Handle settled groups - should not show skip option, redirect to regular join
+    # (settled groups get viewer access, not participant access)
+    if group.is_settled:
+        flash('This group is settled. You can view it as a guest.', 'info')
+        return redirect(url_for('main.join_group_direct', share_token=share_token))
+    
+    # Handle POST - user selected their participant
+    if request.method == 'POST':
+        participant_id = request.form.get('participant_id')
+        if not participant_id:
+            flash('Please select a participant.', 'error')
+            return redirect(url_for('main.skip_join_existing', share_token=share_token))
+        
+        try:
+            participant_id = int(participant_id)
+        except ValueError:
+            flash('Invalid participant selection.', 'error')
+            return redirect(url_for('main.skip_join_existing', share_token=share_token))
+        
+        # Verify participant belongs to this group
+        participant = Participant.query.filter_by(id=participant_id, group_id=group.id).first()
+        if not participant:
+            flash('Invalid participant selection.', 'error')
+            return redirect(url_for('main.skip_join_existing', share_token=share_token))
+        
+        # Set participant session (same as personalized link flow)
+        session[f'participant_{share_token}'] = participant.id
+        session.permanent = True  # Make session permanent for 90-day persistence
+        
+        # Update last accessed timestamp
+        participant.update_last_accessed()
+        
+        current_app.logger.info(f"Participant {participant.name} accessed group '{group.name}' via skip-join from IP {request.remote_addr}")
+        
+        flash(f'Welcome back, {participant.name}!', 'success')
+        return redirect(url_for('main.view_group', share_token=share_token))
+    
+    # GET - Show participant selection
+    # Get all participants ordered by name
+    participants = sorted(group.participants, key=lambda p: p.name.lower())
+    
+    # Edge case: if group has no participants, redirect to join form
+    if not participants:
+        flash('This group has no participants yet. Please join as a new participant.', 'info')
+        return redirect(url_for('main.join_group_direct', share_token=share_token))
+    
+    return render_template('skip_join_select.html', group=group, share_token=share_token, participants=participants)
+
+
 @main.route('/join', methods=['GET', 'POST'])
 def join_group() -> Any:
     """Join group via token input."""
