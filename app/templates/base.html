@@ -1170,6 +1170,7 @@
                 this.socket.on('balance_update', (data) => this.handleBalanceUpdate(data));
                 this.socket.on('admin_action', (data) => this.handleAdminAction(data));
                 this.socket.on('notification', (data) => this.handleNotification(data));
+                this.socket.on('group_name_updated', (data) => this.handleGroupNameUpdate(data));
                 
                 // Error handling
                 this.socket.on('error', (data) => {
@@ -1266,7 +1267,36 @@
                 // Update all balances in real-time
                 this.updateBalancesInDOM(data.balances);
             }
-            
+
+            // Handle group name updates
+            handleGroupNameUpdate(data) {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    console.log('Group name update:', data);
+                }
+
+                // Update group name in the page
+                const groupNameDisplay = document.getElementById('group-name-display');
+                if (groupNameDisplay && data.name) {
+                    groupNameDisplay.textContent = data.name;
+                    document.title = `${data.name} - Splittchen`;
+                }
+
+                // Show notification
+                const message = data.updated_by
+                    ? `${data.updated_by} changed group name to "${data.name}"`
+                    : `Group name changed to "${data.name}"`;
+                this.showUpdateNotification(message, 'info');
+
+                // Send browser notification if tab is not visible
+                if (document.hidden) {
+                    this.notifications.show({
+                        title: 'Group Name Updated',
+                        body: message,
+                        tag: 'group_name_update'
+                    });
+                }
+            }
+
             // Handle admin actions
             handleAdminAction(data) {
                 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
