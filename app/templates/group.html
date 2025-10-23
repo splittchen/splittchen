@@ -3,26 +3,6 @@
 {% block title %}{{ group.name }} - Splittchen{% endblock %}
 
 {% block content %}
-<!-- DEBUG INFO - Remove after testing -->
-{% if request.args.get('debug') %}
-<div class="alert alert-info">
-    <strong>Debug Info:</strong><br>
-    Participant: {{ participant }}<br>
-    Participant ID: {{ participant.id if participant else 'None' }}<br>
-    Participant ID is numeric: {% if participant %}{{ participant.id is number }}{% else %}N/A{% endif %}<br>
-    Participant Name: {{ participant.name if participant else 'None' }}<br>
-    Is Settled: {{ group.is_settled }}<br>
-    Is Expired: {{ group.is_expired }}<br>
-    Exit Button Condition: {% if participant and participant.id is number and not group.is_settled and not group.is_expired %}TRUE (button should show){% else %}FALSE (button hidden){% endif %}<br>
-    <hr>
-    <strong>How to see exit button:</strong><br>
-    1. Join the group as a participant (not just viewing)<br>
-    2. Make sure group is not settled or expired<br>
-    3. You need a real participant ID (numeric), not 'viewer' or 'admin'<br>
-</div>
-{% endif %}
-<!-- END DEBUG INFO -->
-
 <div class="container py-4"
      data-share-token="{{ group.share_token }}"
      data-base-url="{{ request.host_url }}">
