@@ -393,7 +393,7 @@
                                 {% endif %}
                                 <small class="text-muted">Joined {{ p.joined_at.strftime('%d.%m.%Y') }}</small>
                             </div>
-                            {% if is_admin and not group.is_expired and not group.is_settled %}
+                            {% if not group.is_expired and not group.is_settled %}
                             <div class="text-end ms-3">
                                 <button class="btn btn-sm btn-outline-primary edit-participant-btn me-1"
                                         data-participant-id="{{ p.id }}"
@@ -402,7 +402,7 @@
                                         title="Edit participant">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                {% if participants|length > 1 %}
+                                {% if is_admin and participants|length > 1 %}
                                 <button class="btn btn-sm btn-outline-danger remove-participant-btn"
                                         data-participant-id="{{ p.id }}"
                                         data-participant-name="{{ p.name }}"

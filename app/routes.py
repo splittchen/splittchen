@@ -2286,18 +2286,14 @@ def exit_group(share_token):
 
 @main.route('/group/<share_token>/edit-participant/<int:participant_id>', methods=['POST'])
 def edit_participant(share_token, participant_id):
-    """Edit a participant's details."""
+    """Edit a participant's details. Any participant can edit any participant."""
     current_participant, group = verify_participant_access(share_token)
     if not current_participant:
         return render_template('404.html'), 404
-    
-    # Check if user is admin
-    is_admin = verify_admin_access(share_token, group)
-    if not is_admin:
-        current_app.logger.warning(f"Unauthorized participant edit attempt by {current_participant.name} for participant {participant_id} in group {group.name} from IP {request.remote_addr}")
-        flash('Only group admins can edit participants.', 'error')
-        return redirect(url_for('main.view_group', share_token=share_token))
-    
+
+    # Allow any participant to edit (removed admin-only restriction)
+    current_app.logger.info(f"Participant {current_participant.name} editing participant {participant_id} in group {group.name}")
+
     # Find the participant to edit
     participant_to_edit = Participant.query.filter_by(id=participant_id, group_id=group.id).first()
     if not participant_to_edit:
