@@ -31,28 +31,30 @@
         <div class="card-body p-3">
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <div class="d-flex align-items-center mb-2">
+                    <div class="d-flex align-items-center mb-2" id="group-name-container">
                         <h2 class="mb-0" id="group-name-display">{{ group.name }}</h2>
+                        <button class="btn btn-link text-muted p-1 ms-1"
+                                id="edit-group-name-btn"
+                                title="Edit group name"
+                                style="font-size: 1.2rem; line-height: 1;">
+                            <i class="bi bi-pencil"></i>
+                        </button>
                         <input type="text"
                                class="form-control d-none"
                                id="group-name-input"
                                value="{{ group.name }}"
                                maxlength="100"
-                               style="font-size: 1.5rem; font-weight: 500;">
-                        <button class="btn btn-link text-muted p-1 ms-2"
-                                id="edit-group-name-btn"
-                                title="Edit group name"
-                                style="font-size: 1rem;">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn btn-link text-success p-1 ms-2 d-none"
+                               style="font-size: 1.5rem; font-weight: 500; max-width: 300px;">
+                        <button class="btn btn-link text-success p-1 d-none ms-1"
                                 id="save-group-name-btn"
-                                title="Save group name">
+                                title="Save group name"
+                                style="font-size: 1.5rem; line-height: 1;">
                             <i class="bi bi-check-lg"></i>
                         </button>
-                        <button class="btn btn-link text-danger p-1 d-none"
+                        <button class="btn btn-link text-danger p-1 d-none ms-1"
                                 id="cancel-group-name-btn"
-                                title="Cancel editing">
+                                title="Cancel editing"
+                                style="font-size: 1.5rem; line-height: 1;">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
@@ -1784,11 +1786,67 @@ document.addEventListener('DOMContentLoaded', function() {
     .container.py-4 {
         padding-bottom: 90px !important;
     }
+
+    /* Mobile-specific fixes for group name editing */
+    #group-name-container {
+        display: flex !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        overflow: hidden !important;
+    }
+
+    #group-name-display {
+        font-size: 1.25rem;
+        flex-shrink: 1;
+        min-width: 0;
+        max-width: calc(100% - 50px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #group-name-input {
+        font-size: 1.2rem !important;
+        flex-grow: 1;
+        flex-shrink: 1;
+        min-width: 0;
+        max-width: none !important;
+        margin-right: 0.25rem !important;
+    }
+
+    /* Ensure pencil button is visible and properly sized on mobile */
+    #edit-group-name-btn {
+        margin-left: 0.25rem !important;
+        flex-shrink: 0 !important;
+        min-height: 44px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Ensure save/cancel buttons are properly sized on mobile */
+    #save-group-name-btn,
+    #cancel-group-name-btn {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        flex-shrink: 0 !important;
+        padding: 0.5rem !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
 }
 
 /* Ensure body doesn't scroll behind the nav */
 body {
     padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Group name editing - ensure d-none always hides */
+#edit-group-name-btn.d-none,
+#save-group-name-btn.d-none,
+#cancel-group-name-btn.d-none {
+    display: none !important;
 }
 </style>
 
