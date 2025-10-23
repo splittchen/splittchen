@@ -3,26 +3,6 @@
 {% block title %}{{ group.name }} - Splittchen{% endblock %}
 
 {% block content %}
-<!-- DEBUG INFO - Remove after testing -->
-{% if request.args.get('debug') %}
-<div class="alert alert-info">
-    <strong>Debug Info:</strong><br>
-    Participant: {{ participant }}<br>
-    Participant ID: {{ participant.id if participant else 'None' }}<br>
-    Participant ID is numeric: {% if participant %}{{ participant.id is number }}{% else %}N/A{% endif %}<br>
-    Participant Name: {{ participant.name if participant else 'None' }}<br>
-    Is Settled: {{ group.is_settled }}<br>
-    Is Expired: {{ group.is_expired }}<br>
-    Exit Button Condition: {% if participant and participant.id is number and not group.is_settled and not group.is_expired %}TRUE (button should show){% else %}FALSE (button hidden){% endif %}<br>
-    <hr>
-    <strong>How to see exit button:</strong><br>
-    1. Join the group as a participant (not just viewing)<br>
-    2. Make sure group is not settled or expired<br>
-    3. You need a real participant ID (numeric), not 'viewer' or 'admin'<br>
-</div>
-{% endif %}
-<!-- END DEBUG INFO -->
-
 <div class="container py-4"
      data-share-token="{{ group.share_token }}"
      data-base-url="{{ request.host_url }}">
@@ -31,7 +11,33 @@
         <div class="card-body p-3">
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <h2 class="mb-2">{{ group.name }}</h2>
+                    <div class="d-flex align-items-center mb-2" id="group-name-container">
+                        <h2 class="mb-0" id="group-name-display">{{ group.name }}</h2>
+                        <button class="btn btn-link text-muted p-1 ms-1"
+                                id="edit-group-name-btn"
+                                title="Edit group name"
+                                style="font-size: 1.2rem; line-height: 1;">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <input type="text"
+                               class="form-control d-none"
+                               id="group-name-input"
+                               value="{{ group.name }}"
+                               maxlength="100"
+                               style="font-size: 1.5rem; font-weight: 500; max-width: 300px;">
+                        <button class="btn btn-link text-success p-1 d-none ms-1"
+                                id="save-group-name-btn"
+                                title="Save group name"
+                                style="font-size: 1.5rem; line-height: 1;">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                        <button class="btn btn-link text-danger p-1 d-none ms-1"
+                                id="cancel-group-name-btn"
+                                title="Cancel editing"
+                                style="font-size: 1.5rem; line-height: 1;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
                     {% if group.description %}
                         <p class="text-muted mb-2">{{ group.description }}</p>
                     {% endif %}
@@ -801,6 +807,110 @@ document.addEventListener('DOMContentLoaded', function() {
             switchToTab(targetId);
         });
     });
+
+    // Inline group name editing functionality
+    const groupNameDisplay = document.getElementById('group-name-display');
+    const groupNameInput = document.getElementById('group-name-input');
+    const editBtn = document.getElementById('edit-group-name-btn');
+    const saveBtn = document.getElementById('save-group-name-btn');
+    const cancelBtn = document.getElementById('cancel-group-name-btn');
+
+    if (editBtn && groupNameDisplay && groupNameInput) {
+        // Enter edit mode
+        editBtn.addEventListener('click', function() {
+            groupNameDisplay.classList.add('d-none');
+            groupNameInput.classList.remove('d-none');
+            editBtn.classList.add('d-none');
+            saveBtn.classList.remove('d-none');
+            cancelBtn.classList.remove('d-none');
+            groupNameInput.focus();
+            groupNameInput.select();
+        });
+
+        // Cancel editing
+        cancelBtn.addEventListener('click', function() {
+            groupNameInput.value = groupNameDisplay.textContent;
+            exitEditMode();
+        });
+
+        // Save on button click
+        saveBtn.addEventListener('click', function() {
+            saveGroupName();
+        });
+
+        // Save on Enter key
+        groupNameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveGroupName();
+            }
+        });
+
+        // Cancel on Escape key
+        groupNameInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                groupNameInput.value = groupNameDisplay.textContent;
+                exitEditMode();
+            }
+        });
+
+        function exitEditMode() {
+            groupNameDisplay.classList.remove('d-none');
+            groupNameInput.classList.add('d-none');
+            editBtn.classList.remove('d-none');
+            saveBtn.classList.add('d-none');
+            cancelBtn.classList.add('d-none');
+        }
+
+        function saveGroupName() {
+            const newName = groupNameInput.value.trim();
+
+            if (!newName) {
+                alert('Group name cannot be empty');
+                groupNameInput.focus();
+                return;
+            }
+
+            if (newName === groupNameDisplay.textContent) {
+                exitEditMode();
+                return;
+            }
+
+            // Disable buttons during save
+            saveBtn.disabled = true;
+            cancelBtn.disabled = true;
+
+            const shareToken = document.querySelector('[data-share-token]').dataset.shareToken;
+
+            fetch(`/group/${shareToken}/update-name`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ name: newName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    groupNameDisplay.textContent = data.name;
+                    document.title = `${data.name} - Splittchen`;
+                    exitEditMode();
+                } else {
+                    alert(data.error || 'Failed to update group name');
+                    saveBtn.disabled = false;
+                    cancelBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error updating group name:', error);
+                alert('Failed to update group name. Please try again.');
+                saveBtn.disabled = false;
+                cancelBtn.disabled = false;
+            });
+        }
+    }
 });
 
 function shareGroup() {
@@ -1656,11 +1766,67 @@ document.addEventListener('DOMContentLoaded', function() {
     .container.py-4 {
         padding-bottom: 90px !important;
     }
+
+    /* Mobile-specific fixes for group name editing */
+    #group-name-container {
+        display: flex !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        overflow: hidden !important;
+    }
+
+    #group-name-display {
+        font-size: 1.25rem;
+        flex-shrink: 1;
+        min-width: 0;
+        max-width: calc(100% - 50px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #group-name-input {
+        font-size: 1.2rem !important;
+        flex-grow: 1;
+        flex-shrink: 1;
+        min-width: 0;
+        max-width: none !important;
+        margin-right: 0.25rem !important;
+    }
+
+    /* Ensure pencil button is visible and properly sized on mobile */
+    #edit-group-name-btn {
+        margin-left: 0.25rem !important;
+        flex-shrink: 0 !important;
+        min-height: 44px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Ensure save/cancel buttons are properly sized on mobile */
+    #save-group-name-btn,
+    #cancel-group-name-btn {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        flex-shrink: 0 !important;
+        padding: 0.5rem !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
 }
 
 /* Ensure body doesn't scroll behind the nav */
 body {
     padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Group name editing - ensure d-none always hides */
+#edit-group-name-btn.d-none,
+#save-group-name-btn.d-none,
+#cancel-group-name-btn.d-none {
+    display: none !important;
 }
 </style>
 

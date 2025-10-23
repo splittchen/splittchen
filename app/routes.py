@@ -488,6 +488,49 @@ def view_group(share_token: str) -> Any:
                          currency_service=currency_service)
 
 
+@main.route('/group/<share_token>/update-name', methods=['POST'])
+def update_group_name(share_token):
+    """Update group name with real-time propagation to all participants."""
+    participant, group = verify_participant_access(share_token)
+    if not participant:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    # Get new name from request
+    data = request.get_json()
+    new_name = data.get('name', '').strip()
+
+    # Validate name
+    if not new_name:
+        return jsonify({'success': False, 'error': 'Group name cannot be empty'}), 400
+
+    if len(new_name) > 100:
+        return jsonify({'success': False, 'error': 'Group name too long (max 100 characters)'}), 400
+
+    # Update group name
+    old_name = group.name
+    group.name = new_name
+
+    try:
+        db.session.commit()
+        current_app.logger.info(f"Group name updated from '{old_name}' to '{new_name}' by {participant.name}")
+
+        # Emit WebSocket event to all participants in the group
+        from app.socketio_app import get_socketio
+        socketio = get_socketio()
+        if socketio:
+            socketio.emit('group_name_updated', {
+                'name': new_name,
+                'updated_by': participant.name
+            }, room=f'group_{share_token}')
+
+        return jsonify({'success': True, 'name': new_name})
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Failed to update group name: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to update group name'}), 500
+
+
 @main.route('/group/<share_token>/add-expense', methods=['GET', 'POST'])
 def add_expense(share_token):
     """Add expense to group."""
