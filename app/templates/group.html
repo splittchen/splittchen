@@ -896,6 +896,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     groupNameDisplay.textContent = data.name;
                     document.title = `${data.name} - Splittchen`;
+                    // Re-enable buttons before exiting edit mode
+                    saveBtn.disabled = false;
+                    cancelBtn.disabled = false;
                     exitEditMode();
                 } else {
                     alert(data.error || 'Failed to update group name');
