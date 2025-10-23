@@ -2,6 +2,8 @@
 
 A privacy-first expense splitting app built with Flask. Create groups, split expenses, and settle debts without registration. Perfect for roommates, travel groups, and recurring bills.
 
+Hosted Version: **https://splittchen.com**
+
 ## ✨ Features
 
 - **🔐 No Registration**: Token-based access, no accounts needed
