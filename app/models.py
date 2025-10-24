@@ -170,38 +170,49 @@ class Group(db.Model):
     def delete_group(self):
         """
         Permanently delete this group and all associated data.
-        
+
         This is a destructive operation that cannot be undone.
         Deletes in proper order to respect foreign key constraints:
         1. EmailLog entries (reference participants and groups)
         2. AuditLog entries (reference participants, expenses, and groups)
-        3. ExpenseShare entries (via cascade from Expense deletion)
-        4. Expense entries (reference participants via paid_by_id)
-        5. Participant entries
-        6. SettlementPeriod entries
-        7. Group entry
-        
+        3. SettlementPayment entries (reference participants and settlement periods)
+        4. ExpenseShare entries (via cascade from Expense deletion)
+        5. Expense entries (reference participants via paid_by_id)
+        6. Participant entries
+        7. SettlementPeriod entries
+        8. Group entry
+
         Returns:
             dict: Summary of deleted records
         """
         deleted_summary = {
             'email_logs': 0,
             'audit_logs': 0,
+            'settlement_payments': 0,
             'expense_shares': 0,
             'expenses': 0,
             'participants': 0,
             'settlement_periods': 0,
             'group_name': self.name
         }
-        
+
         # Count records before deletion for summary
         deleted_summary['email_logs'] = EmailLog.query.filter_by(group_id=self.id).count()
         deleted_summary['audit_logs'] = AuditLog.query.filter_by(group_id=self.id).count()
+
+        # Count settlement payments
+        from app.models import SettlementPayment
+        period_ids = [period.id for period in self.settlement_periods]
+        if period_ids:
+            deleted_summary['settlement_payments'] = SettlementPayment.query.filter(
+                SettlementPayment.settlement_period_id.in_(period_ids)
+            ).count()
+
         deleted_summary['expense_shares'] = sum(len(expense.expense_shares) for expense in self.expenses)
         deleted_summary['expenses'] = len(self.expenses)
         deleted_summary['participants'] = len(self.participants)
-        deleted_summary['settlement_periods'] = SettlementPeriod.query.filter_by(group_id=self.id).count()
-        
+        deleted_summary['settlement_periods'] = len(self.settlement_periods)
+
         try:
             # Use bulk delete operations to avoid SQLAlchemy warnings
             # Delete in proper order to respect foreign key constraints
@@ -212,12 +223,20 @@ class Group(db.Model):
             # 1. Delete email logs first (they reference participants and groups)
             email_deleted = EmailLog.query.filter_by(group_id=self.id).delete(synchronize_session=False)
             current_app.logger.debug(f'Deleted {email_deleted} email logs')
-            
+
             # 2. Delete audit logs (they reference expenses and participants)
             audit_deleted = AuditLog.query.filter_by(group_id=self.id).delete(synchronize_session=False)
             current_app.logger.debug(f'Deleted {audit_deleted} audit logs')
 
-            # 3. Delete expense shares (they reference both expenses and participants)
+            # 3. Delete settlement payments (they reference participants and settlement periods)
+            payments_deleted = 0
+            if period_ids:
+                payments_deleted = SettlementPayment.query.filter(
+                    SettlementPayment.settlement_period_id.in_(period_ids)
+                ).delete(synchronize_session=False)
+            current_app.logger.debug(f'Deleted {payments_deleted} settlement payments')
+
+            # 4. Delete expense shares (they reference both expenses and participants)
             from app.models import ExpenseShare
             expense_ids = [expense.id for expense in self.expenses]
             shares_deleted = 0
@@ -225,19 +244,19 @@ class Group(db.Model):
                 shares_deleted = ExpenseShare.query.filter(ExpenseShare.expense_id.in_(expense_ids)).delete(synchronize_session=False)
             current_app.logger.debug(f'Deleted {shares_deleted} expense shares')
 
-            # 4. Delete expenses (they reference participants via paid_by_id)
+            # 5. Delete expenses (they reference participants via paid_by_id)
             expenses_deleted = Expense.query.filter_by(group_id=self.id).delete(synchronize_session=False)
             current_app.logger.debug(f'Deleted {expenses_deleted} expenses')
 
-            # 5. Delete participants
+            # 6. Delete participants
             participants_deleted = Participant.query.filter_by(group_id=self.id).delete(synchronize_session=False)
             current_app.logger.debug(f'Deleted {participants_deleted} participants')
 
-            # 6. Delete settlement periods
+            # 7. Delete settlement periods
             periods_deleted = SettlementPeriod.query.filter_by(group_id=self.id).delete(synchronize_session=False)
             current_app.logger.debug(f'Deleted {periods_deleted} settlement periods')
 
-            # 7. Finally delete the group itself
+            # 8. Finally delete the group itself
             current_app.logger.debug(f'Deleting group object {self.name}')
             db.session.delete(self)
 
@@ -245,13 +264,13 @@ class Group(db.Model):
             current_app.logger.debug('Committing all deletions to database')
             db.session.commit()
             current_app.logger.info(f'Successfully committed deletion of group {deleted_summary["group_name"]}')
-            
+
         except Exception as e:
             # Rollback on any error
             current_app.logger.error(f'Error during group deletion for {deleted_summary["group_name"]}: {str(e)}', exc_info=True)
             db.session.rollback()
             raise e
-        
+
         return deleted_summary
 
 
@@ -421,19 +440,20 @@ class ExpenseShare(db.Model):
 class SettlementPeriod(db.Model):
     """Settlement period tracking for recurring groups."""
     __tablename__ = 'settlement_periods'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     period_name = db.Column(db.String(20), nullable=False)  # e.g., '2024-09'
     settled_at = db.Column(db.DateTime, nullable=False, index=True)
     total_amount = db.Column(db.Numeric(15, 2))  # Total expenses for this period
     participant_count = db.Column(db.Integer)  # Number of participants at settlement
-    
+
     # Foreign key
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False, index=True)
-    
-    # Relationship
+
+    # Relationships
     group = db.relationship('Group', backref='settlement_periods')
-    
+    payments = db.relationship('SettlementPayment', back_populates='settlement_period', cascade='all, delete-orphan')
+
     def __init__(self, period_name: str, group_id: int, settled_at: Optional[datetime] = None,
                  total_amount: Optional[float] = None, participant_count: Optional[int] = None, **kwargs):
         """Initialize SettlementPeriod instance."""
@@ -443,9 +463,60 @@ class SettlementPeriod(db.Model):
         self.settled_at = settled_at or datetime.now(timezone.utc)
         self.total_amount = total_amount
         self.participant_count = participant_count
-    
+
     def __repr__(self) -> str:
         return f'<SettlementPeriod {self.period_name}: ${self.total_amount}>'
+
+
+class SettlementPayment(db.Model):
+    """Payment tracking for settlements - who owes whom and payment confirmation status."""
+    __tablename__ = 'settlement_payments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    amount = db.Column(db.Numeric(15, 2), nullable=False)  # Payment amount
+    currency = db.Column(db.String(3), nullable=False)  # Payment currency
+    is_paid = db.Column(db.Boolean, default=False, nullable=False, index=True)  # Payment confirmation status
+    paid_at = db.Column(db.DateTime)  # When payment was confirmed
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+    # Foreign keys
+    settlement_period_id = db.Column(db.Integer, db.ForeignKey('settlement_periods.id'), nullable=False, index=True)
+    from_participant_id = db.Column(db.Integer, db.ForeignKey('participants.id'), nullable=False, index=True)  # Debtor
+    to_participant_id = db.Column(db.Integer, db.ForeignKey('participants.id'), nullable=False, index=True)  # Creditor
+    paid_by_participant_id = db.Column(db.Integer, db.ForeignKey('participants.id'))  # Who confirmed payment
+
+    # Relationships
+    settlement_period = db.relationship('SettlementPeriod', back_populates='payments')
+    from_participant = db.relationship('Participant', foreign_keys=[from_participant_id], backref='debts')
+    to_participant = db.relationship('Participant', foreign_keys=[to_participant_id], backref='credits')
+    paid_by_participant = db.relationship('Participant', foreign_keys=[paid_by_participant_id])
+
+    def __init__(self, settlement_period_id: int, from_participant_id: int, to_participant_id: int,
+                 amount: float, currency: str = 'USD', is_paid: bool = False, **kwargs):
+        """Initialize SettlementPayment instance."""
+        super().__init__(**kwargs)
+        self.settlement_period_id = settlement_period_id
+        self.from_participant_id = from_participant_id
+        self.to_participant_id = to_participant_id
+        self.amount = amount
+        self.currency = currency
+        self.is_paid = is_paid
+
+    def mark_as_paid(self, confirmed_by_participant_id: int) -> None:
+        """Mark payment as confirmed."""
+        self.is_paid = True
+        self.paid_at = datetime.now(timezone.utc)
+        self.paid_by_participant_id = confirmed_by_participant_id
+
+    def mark_as_unpaid(self) -> None:
+        """Mark payment as unconfirmed (admin override)."""
+        self.is_paid = False
+        self.paid_at = None
+        self.paid_by_participant_id = None
+
+    def __repr__(self) -> str:
+        status = "PAID" if self.is_paid else "UNPAID"
+        return f'<SettlementPayment {self.from_participant_id}→{self.to_participant_id}: ${self.amount} {status}>'
 
 
 class KnownEmail(db.Model):

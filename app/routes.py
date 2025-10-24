@@ -528,12 +528,24 @@ def view_group(share_token: str) -> Any:
     is_admin = verify_admin_access(share_token, group)
     
     # Get audit logs for history tab
-    from app.models import AuditLog
+    from app.models import AuditLog, SettlementPayment
     limit = current_app.config.get('ACTIVITY_LOG_LIMIT', 100)
     audit_logs = AuditLog.query.filter_by(group_id=group.id).order_by(AuditLog.created_at.desc()).limit(limit).all()
-    
-    return render_template('group.html', 
-                         group=group, 
+
+    # Get settlement payments for settled groups OR recurring groups with settlement periods
+    settlement_payments = []
+    if group.settlement_periods:
+        # Get the latest settlement period (most recent for recurring groups, final for settled groups)
+        latest_period = group.settlement_periods[-1]
+        settlement_payments = (SettlementPayment.query
+                             .filter_by(settlement_period_id=latest_period.id)
+                             .options(joinedload(SettlementPayment.from_participant),
+                                    joinedload(SettlementPayment.to_participant),
+                                    joinedload(SettlementPayment.paid_by_participant))
+                             .all())
+
+    return render_template('group.html',
+                         group=group,
                          participant=participant,
                          expenses=expenses,
                          all_expenses=all_expenses,
@@ -542,6 +554,7 @@ def view_group(share_token: str) -> Any:
                          participants=group.participants,
                          is_admin=is_admin,
                          audit_logs=audit_logs,
+                         settlement_payments=settlement_payments,
                          display_currency=display_currency,
                          currency_choices=currency_service.get_currency_choices(),
                          format_currency=format_currency,
@@ -861,18 +874,18 @@ def settle_group(share_token):
         # Get balances before settling
         balances = group.get_balances(group.currency)
         settlements = calculate_settlements(balances)
-        
+
         # Create settlement period entry for history tracking
         from datetime import date
-        from app.models import SettlementPeriod
-        
+        from app.models import SettlementPeriod, SettlementPayment
+
         today = date.today()
         period_name = f"{today.strftime('%Y-%m')}-FINAL"  # Mark as final settlement
-        
+
         # Calculate total expenses (not archived)
         current_expenses = [exp for exp in group.expenses if not exp.is_archived]
         total_amount = sum(expense.amount for expense in current_expenses)
-        
+
         settlement_period = SettlementPeriod(
             group_id=group.id,
             period_name=period_name,
@@ -881,26 +894,40 @@ def settle_group(share_token):
             participant_count=len(group.participants)
         )
         db.session.add(settlement_period)
-        
+        db.session.flush()  # Flush to get settlement_period.id
+
+        # Create SettlementPayment records for payment tracking
+        for settlement in settlements:
+            payment = SettlementPayment(
+                settlement_period_id=settlement_period.id,
+                from_participant_id=settlement['from_participant_id'],
+                to_participant_id=settlement['to_participant_id'],
+                amount=settlement['amount'],
+                currency=group.currency,
+                is_paid=False
+            )
+            db.session.add(payment)
+
         # Archive current expenses
         for expense in current_expenses:
             expense.settlement_period = period_name
             expense.is_archived = True
-        
+
         # Mark group as settled
         group.is_settled = True
         group.settled_at = dt.now(timezone.utc)
-        
+
         # Create audit log entry for final settlement
         from app.models import AuditLog
         audit_log = AuditLog(
             group_id=group.id,
             action='group_settled',
-            description=f'Group settled and closed: {len(current_expenses)} expenses archived to period {period_name}.',
+            description=f'Group settled and closed: {len(current_expenses)} expenses archived to period {period_name}. {len(settlements)} payments created.',
             details={
                 'settlement_type': 'final_settlement',
                 'period_name': period_name,
                 'expenses_archived': len(current_expenses),
+                'payments_created': len(settlements),
                 'total_amount': float(total_amount),
                 'participants_count': len(group.participants),
                 'group_closed': True
@@ -908,12 +935,13 @@ def settle_group(share_token):
             performed_by='Admin'
         )
         db.session.add(audit_log)
-        
+
         return {
             'balances': balances,
             'settlements': settlements,
             'period_name': period_name,
-            'current_expenses': current_expenses
+            'current_expenses': current_expenses,
+            'settlement_period_id': settlement_period.id
         }
 
     try:
@@ -1022,30 +1050,30 @@ def settle_only_group(share_token):
         # Get current balances and settlements
         balances = group.get_balances(group.currency)
         settlements = calculate_settlements(balances)
-        
+
         # Check if there are any expenses or balances to settle
         current_expenses = [exp for exp in group.expenses if not exp.is_archived]
         if not current_expenses:
             flash('No current expenses to settle. Add some expenses first.', 'warning')
             return redirect(url_for('main.view_group', share_token=share_token))
-        
+
         # Check if there are any non-zero balances
         has_balances = any(abs(balance) > 0.01 for balance in balances.values())
         if not has_balances:
             flash('All balances are already settled. No settlement report needed.', 'info')
             return redirect(url_for('main.view_group', share_token=share_token))
-        
+
         from app.utils import send_final_settlement_report
         from datetime import date
-        from app.models import SettlementPeriod
-        
+        from app.models import SettlementPeriod, SettlementPayment
+
         # Create settlement period name (YYYY-MM format)
         today = date.today()
         period_name = today.strftime('%Y-%m')
-        
+
         # Calculate total expenses for this period
         total_amount = sum(expense.amount for expense in current_expenses)
-        
+
         # Create settlement period record - always create for settlement reports
         settlement_period = SettlementPeriod(
             group_id=group.id,
@@ -1055,12 +1083,25 @@ def settle_only_group(share_token):
             participant_count=len(group.participants)
         )
         db.session.add(settlement_period)
-        
+        db.session.flush()  # Flush to get settlement_period.id
+
+        # Create SettlementPayment records for payment tracking
+        for settlement in settlements:
+            payment = SettlementPayment(
+                settlement_period_id=settlement_period.id,
+                from_participant_id=settlement['from_participant_id'],
+                to_participant_id=settlement['to_participant_id'],
+                amount=settlement['amount'],
+                currency=group.currency,
+                is_paid=False
+            )
+            db.session.add(payment)
+
         # Archive current expenses - always archive when settling
         for expense in current_expenses:
             expense.settlement_period = period_name
             expense.is_archived = True
-        
+
         # Update next settlement date for recurring groups
         if group.is_recurring:
             from datetime import time
@@ -1071,7 +1112,7 @@ def settle_only_group(share_token):
             else:
                 next_month_year = today.year
                 next_month = today.month + 1
-            
+
             last_day_next = calendar.monthrange(next_month_year, next_month)[1]
             next_settlement = date(next_month_year, next_month, last_day_next)
             settlement_time = time(hour=23, minute=59)
@@ -1160,56 +1201,225 @@ def settle_only_group(share_token):
     return redirect(url_for('main.view_group', share_token=share_token))
 
 
+@main.route('/payment/<int:payment_id>/confirm', methods=['POST', 'GET'])
+def confirm_payment(payment_id):
+    """Mark a settlement payment as paid (accessible to all participants)."""
+    from app.models import SettlementPayment, Participant, AuditLog
+
+    payment = SettlementPayment.query.get_or_404(payment_id)
+    group = payment.settlement_period.group
+
+    # Get share token for redirects
+    share_token = group.share_token
+
+    # Verify participant access - check if user is part of this group
+    participant_key = f'participant_{share_token}'
+    participant_id = session.get(participant_key)
+
+    if not participant_id:
+        # Check for access token in query string (from email links)
+        access_token = request.args.get('token')
+        if access_token:
+            participant = Participant.query.filter_by(access_token=access_token, group_id=group.id).first()
+            if participant:
+                # Set participant session
+                session[participant_key] = participant_id = participant.id
+                session.permanent = True
+            else:
+                flash('Invalid access link. Please join the group first.', 'error')
+                return redirect(url_for('main.join_group', share_token=share_token))
+        else:
+            flash('Please join the group to confirm payments.', 'warning')
+            return redirect(url_for('main.join_group', share_token=share_token))
+
+    # Get participant from session
+    participant = Participant.query.filter_by(id=participant_id, group_id=group.id).first()
+    if not participant:
+        flash('Participant session expired. Please rejoin the group.', 'error')
+        return redirect(url_for('main.join_group', share_token=share_token))
+
+    # Check if already paid
+    if payment.is_paid:
+        flash('This payment has already been marked as paid.', 'info')
+        return redirect(url_for('main.view_group', share_token=share_token))
+
+    try:
+        # Mark payment as paid
+        payment.mark_as_paid(confirmed_by_participant_id=participant.id)
+
+        # Create audit log entry
+        from_participant_name = payment.from_participant.name
+        to_participant_name = payment.to_participant.name
+        audit_log = AuditLog(
+            group_id=group.id,
+            action='payment_confirmed',
+            description=f'{participant.name} confirmed payment: {from_participant_name} → {to_participant_name} ({format_currency(payment.amount, payment.currency)})',
+            details={
+                'payment_id': payment.id,
+                'from_participant_id': payment.from_participant_id,
+                'to_participant_id': payment.to_participant_id,
+                'amount': float(payment.amount),
+                'currency': payment.currency,
+                'confirmed_by': participant.name
+            },
+            performed_by=participant.name,
+            performed_by_participant_id=participant.id
+        )
+        db.session.add(audit_log)
+
+        db.session.commit()
+
+        flash(f'Payment confirmed: {from_participant_name} → {to_participant_name} ({format_currency(payment.amount, payment.currency)})', 'success')
+
+        # Broadcast payment update via WebSocket
+        from app.socketio_events.group_events import broadcast_balance_updated
+        broadcast_balance_updated(share_token, {
+            'payment_confirmed': {
+                'payment_id': payment.id,
+                'is_paid': True
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error confirming payment: {e}')
+        flash('Error confirming payment. Please try again.', 'error')
+
+    return redirect(url_for('main.view_group', share_token=share_token))
+
+
+@main.route('/payment/<int:payment_id>/toggle', methods=['POST'])
+def toggle_payment_status(payment_id):
+    """Toggle payment status (admin override)."""
+    from app.models import SettlementPayment, AuditLog
+
+    payment = SettlementPayment.query.get_or_404(payment_id)
+    group = payment.settlement_period.group
+    share_token = group.share_token
+
+    # Verify admin access
+    is_admin = verify_admin_access(share_token, group)
+    if not is_admin:
+        abort(403)
+
+    try:
+        # Toggle payment status
+        was_paid = payment.is_paid
+        if was_paid:
+            payment.mark_as_unpaid()
+            action_desc = 'marked as unpaid'
+        else:
+            # Admin override - mark as paid by admin
+            admin_participant = Participant.query.filter_by(group_id=group.id, is_admin=True).first()
+            payment.mark_as_paid(confirmed_by_participant_id=admin_participant.id if admin_participant else None)
+            action_desc = 'marked as paid'
+
+        # Create audit log entry
+        from_participant_name = payment.from_participant.name
+        to_participant_name = payment.to_participant.name
+        audit_log = AuditLog(
+            group_id=group.id,
+            action='payment_status_toggled',
+            description=f'Admin {action_desc} payment: {from_participant_name} → {to_participant_name} ({format_currency(payment.amount, payment.currency)})',
+            details={
+                'payment_id': payment.id,
+                'from_participant_id': payment.from_participant_id,
+                'to_participant_id': payment.to_participant_id,
+                'amount': float(payment.amount),
+                'currency': payment.currency,
+                'previous_status': 'paid' if was_paid else 'unpaid',
+                'new_status': 'unpaid' if was_paid else 'paid'
+            },
+            performed_by='Admin'
+        )
+        db.session.add(audit_log)
+
+        db.session.commit()
+
+        flash(f'Payment {action_desc}: {from_participant_name} → {to_participant_name}', 'success')
+
+        # Broadcast payment update via WebSocket
+        from app.socketio_events.group_events import broadcast_balance_updated
+        broadcast_balance_updated(share_token, {
+            'payment_updated': {
+                'payment_id': payment.id,
+                'is_paid': payment.is_paid
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error toggling payment status: {e}')
+        flash('Error updating payment status. Please try again.', 'error')
+
+    return redirect(url_for('main.view_group', share_token=share_token))
+
+
 @main.route('/group/<share_token>/reopen', methods=['POST'])
 def reopen_group(share_token):
     """Reopen a settled or expired group (admin only)."""
     # Find group regardless of is_active status to allow reopening expired groups
     group = Group.query.filter_by(share_token=share_token).first_or_404()
-    
+
     # Check if user is admin
     is_admin = verify_admin_access(share_token, group)
     if not is_admin:
         abort(403)
-    
+
     if not group.is_settled and not group.is_expired and group.is_active:
         flash('Group is already active and not settled or expired.', 'info')
         return redirect(url_for('main.view_group', share_token=share_token))
-    
+
     try:
+        # Clear payment confirmations when reopening
+        from app.models import SettlementPayment
+        period_ids = [period.id for period in group.settlement_periods]
+        if period_ids:
+            # Reset all payment confirmations for this group
+            SettlementPayment.query.filter(
+                SettlementPayment.settlement_period_id.in_(period_ids),
+                SettlementPayment.is_paid == True
+            ).update({
+                'is_paid': False,
+                'paid_at': None,
+                'paid_by_participant_id': None
+            }, synchronize_session=False)
+
         # Reopen the group
         group.is_active = True  # Reactivate the group
         group.is_settled = False
         group.settled_at = None
-        
+
         # If group was expired, remove the expiration date to make it a normal group
         if group.is_expired:
             group.expires_at = None
-            flash('Expired group has been reopened and converted to a normal group (expiration date removed). You can now add more expenses.', 'success')
+            flash('Expired group has been reopened and converted to a normal group (expiration date removed). All payment confirmations cleared. You can now add more expenses.', 'success')
         else:
-            flash('Group has been reopened successfully! You can now add more expenses.', 'success')
-        
+            flash('Group has been reopened successfully! All payment confirmations cleared. You can now add more expenses.', 'success')
+
         # Create audit log entry for reopening
         from app.models import AuditLog
         audit_log = AuditLog(
             group_id=group.id,
             action='group_reopened',
-            description=f'Group reopened by admin. Expiration date {"removed" if group.is_expired else "not applicable"}.',
+            description=f'Group reopened by admin. Expiration date {"removed" if group.is_expired else "not applicable"}. Payment confirmations cleared.',
             details={
                 'was_expired': group.is_expired,
                 'was_settled': group.is_settled,
-                'expiration_removed': group.is_expired
+                'expiration_removed': group.is_expired,
+                'payments_cleared': True
             },
             performed_by='Admin'
         )
         db.session.add(audit_log)
-        
+
         db.session.commit()
-        
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'Error reopening group: {e}')
         flash('Error reopening group. Please try again.', 'error')
-    
+
     return redirect(url_for('main.view_group', share_token=share_token))
 
 
@@ -1264,7 +1474,7 @@ def remove_expiration_date(share_token):
 def delete_group(share_token):
     """Permanently delete a group and all associated data (admin only)."""
     group = Group.query.filter_by(share_token=share_token).first_or_404()
-    
+
     # Check if user is admin
     is_admin = verify_admin_access(share_token, group)
     if not is_admin:
@@ -1274,6 +1484,19 @@ def delete_group(share_token):
     if not group.is_active:
         flash(f'Group "{group.name}" has already been deleted.', 'info')
         return redirect(url_for('main.index'))
+
+    # Check for unpaid settlement payments
+    from app.models import SettlementPayment
+    period_ids = [period.id for period in group.settlement_periods]
+    if period_ids:
+        unpaid_count = SettlementPayment.query.filter(
+            SettlementPayment.settlement_period_id.in_(period_ids),
+            SettlementPayment.is_paid == False
+        ).count()
+
+        if unpaid_count > 0:
+            flash(f'Cannot delete group: {unpaid_count} payment(s) are still pending confirmation. Please ensure all participants confirm their payments first, or use admin override to mark payments as paid.', 'error')
+            return redirect(url_for('main.view_group', share_token=share_token))
 
     try:
         # Store group info for processing
