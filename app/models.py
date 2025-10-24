@@ -262,6 +262,12 @@ class Group(db.Model):
             periods_deleted = SettlementPeriod.query.filter_by(group_id=self.id).delete(synchronize_session=False)
             current_app.logger.debug(f'Deleted {periods_deleted} settlement periods')
 
+            # Expire the group's settlement_periods relationship to prevent StaleDataError
+            # After bulk delete, SQLAlchemy's session still thinks the relationship exists
+            # Expiring it prevents UPDATE attempts on already-deleted rows during commit
+            db.session.expire(self, ['settlement_periods'])
+            current_app.logger.debug('Expired settlement_periods relationship on group object')
+
             # 8. Finally delete the group itself
             current_app.logger.debug(f'Deleting group object {self.name}')
             db.session.delete(self)
