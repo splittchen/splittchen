@@ -536,7 +536,7 @@ def send_precreated_participant_invitation(to_email: str, participant_name: str,
     if participant:
         personal_access_url = participant.generate_access_url(base_url)
     elif access_token and share_token:
-        personal_access_url = f"{base_url}/group/{share_token}?access_token={access_token}"
+        personal_access_url = f"{base_url}/group/{share_token}?p={access_token}"
     else:
         current_app.logger.error("Cannot generate access URL: missing participant object or access_token/share_token")
         return False
@@ -659,12 +659,12 @@ You were added by the group administrator.
     return success
 
 
-def send_final_settlement_report(to_email: str, participant_name: str, group_name: str, 
+def send_final_settlement_report(to_email: str, participant_name: str, group_name: str,
                                 balances: Dict[int, float], settlements: list,
-                                participants: list, currency: str, is_period_settlement: bool = False, 
+                                participants: list, currency: str, is_period_settlement: bool = False,
                                 is_expiration_settlement: bool = False, is_deletion_settlement: bool = False,
                                 group_id: Optional[int] = None, participant_id: Optional[int] = None,
-                                share_token: Optional[str] = None) -> tuple[bool, str]:
+                                share_token: Optional[str] = None, settlement_payments: Optional[list] = None) -> tuple[bool, str]:
     """Send final settlement report email to participant."""
     base_url = current_app.config['BASE_URL']
     
@@ -677,13 +677,15 @@ def send_final_settlement_report(to_email: str, participant_name: str, group_nam
     else:
         subject = f'Group Settled & Closed - {group_name}'
     
-    # Find participant's balance
+    # Find participant's balance and access token
     participant_balance = 0.0
     participant_id = None
+    participant_access_token = None
     for p in participants:
         if p.email == to_email:
             participant_balance = balances.get(p.id, 0.0)
             participant_id = p.id
+            participant_access_token = p.access_token
             break
     
     # Find settlements involving this participant
@@ -691,6 +693,13 @@ def send_final_settlement_report(to_email: str, participant_name: str, group_nam
     for settlement in settlements:
         if settlement['from_participant_id'] == participant_id or settlement['to_participant_id'] == participant_id:
             participant_settlements.append(settlement)
+
+    # Build payment ID mapping if settlement_payments provided
+    payment_id_map = {}
+    if settlement_payments:
+        for payment in settlement_payments:
+            key = (payment.from_participant_id, payment.to_participant_id)
+            payment_id_map[key] = payment.id
     
     # Format balance
     if participant_balance > 0.01:
@@ -759,7 +768,10 @@ def send_final_settlement_report(to_email: str, participant_name: str, group_nam
             <h3 style="color: #16a34a;">Required Payments</h3>
             <div style="background: #fff3cd; padding: 15px; border-radius: 6px; border-left: 4px solid #ffc107;">
             """ + "".join([
-                f"<p style='margin: 5px 0;'><strong>Pay {format_currency(s['amount'], currency)}</strong> to {next(p.name for p in participants if p.id == s['to_participant_id'])}{next((' (' + p.email + ')') if p.email else '' for p in participants if p.id == s['to_participant_id'])}</p>"
+                f"""<div style='margin: 10px 0; padding: 10px; background: white; border-radius: 4px;'>
+                    <p style='margin: 5px 0;'><strong>Pay {format_currency(s['amount'], currency)}</strong> to {next(p.name for p in participants if p.id == s['to_participant_id'])}{next((' (' + p.email + ')') if p.email else '' for p in participants if p.id == s['to_participant_id'])}</p>
+                    {f'<a href="{base_url}/payment/{payment_id_map.get((s["from_participant_id"], s["to_participant_id"]))}/confirm?token={participant_access_token}" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">✓ Mark as Paid</a>' if payment_id_map.get((s["from_participant_id"], s["to_participant_id"])) and participant_access_token else ''}
+                </div>"""
                 for s in participant_settlements if s['from_participant_id'] == participant_id
             ]) + "</div>" if any(s['from_participant_id'] == participant_id for s in participant_settlements) else ""}
             
@@ -767,7 +779,10 @@ def send_final_settlement_report(to_email: str, participant_name: str, group_nam
             <h3 style="color: #16a34a;">Expected Payments to You</h3>
             <div style="background: #d1fae5; padding: 15px; border-radius: 6px; border-left: 4px solid #10b981;">
             """ + "".join([
-                f"<p style='margin: 5px 0;'><strong>Receive {format_currency(s['amount'], currency)}</strong> from {next(p.name for p in participants if p.id == s['from_participant_id'])}{next((' (' + p.email + ')') if p.email else '' for p in participants if p.id == s['from_participant_id'])}</p>"
+                f"""<div style='margin: 10px 0; padding: 10px; background: white; border-radius: 4px;'>
+                    <p style='margin: 5px 0;'><strong>Receive {format_currency(s['amount'], currency)}</strong> from {next(p.name for p in participants if p.id == s['from_participant_id'])}{next((' (' + p.email + ')') if p.email else '' for p in participants if p.id == s['from_participant_id'])}</p>
+                    {f'<a href="{base_url}/payment/{payment_id_map.get((s["from_participant_id"], s["to_participant_id"]))}/confirm?token={participant_access_token}" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">✓ Mark as Paid</a>' if payment_id_map.get((s["from_participant_id"], s["to_participant_id"])) and participant_access_token else ''}
+                </div>"""
                 for s in participant_settlements if s['to_participant_id'] == participant_id
             ]) + "</div>" if any(s['to_participant_id'] == participant_id for s in participant_settlements) else ""}
             

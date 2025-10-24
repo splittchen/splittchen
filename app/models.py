@@ -196,22 +196,27 @@ class Group(db.Model):
             'group_name': self.name
         }
 
-        # Count records before deletion for summary
+        # Count records before deletion for summary (without loading objects into session)
         deleted_summary['email_logs'] = EmailLog.query.filter_by(group_id=self.id).count()
         deleted_summary['audit_logs'] = AuditLog.query.filter_by(group_id=self.id).count()
+        deleted_summary['settlement_periods'] = SettlementPeriod.query.filter_by(group_id=self.id).count()
+        deleted_summary['participants'] = Participant.query.filter_by(group_id=self.id).count()
+        deleted_summary['expenses'] = Expense.query.filter_by(group_id=self.id).count()
 
-        # Count settlement payments
-        from app.models import SettlementPayment
-        period_ids = [period.id for period in self.settlement_periods]
+        # Count settlement payments and expense shares
+        from app.models import SettlementPayment, ExpenseShare
+        period_ids = [p[0] for p in db.session.query(SettlementPeriod.id).filter_by(group_id=self.id).all()]
+        expense_ids = [e[0] for e in db.session.query(Expense.id).filter_by(group_id=self.id).all()]
+
         if period_ids:
             deleted_summary['settlement_payments'] = SettlementPayment.query.filter(
                 SettlementPayment.settlement_period_id.in_(period_ids)
             ).count()
 
-        deleted_summary['expense_shares'] = sum(len(expense.expense_shares) for expense in self.expenses)
-        deleted_summary['expenses'] = len(self.expenses)
-        deleted_summary['participants'] = len(self.participants)
-        deleted_summary['settlement_periods'] = len(self.settlement_periods)
+        if expense_ids:
+            deleted_summary['expense_shares'] = ExpenseShare.query.filter(
+                ExpenseShare.expense_id.in_(expense_ids)
+            ).count()
 
         try:
             # Use bulk delete operations to avoid SQLAlchemy warnings
@@ -234,6 +239,7 @@ class Group(db.Model):
                 payments_deleted = SettlementPayment.query.filter(
                     SettlementPayment.settlement_period_id.in_(period_ids)
                 ).delete(synchronize_session=False)
+                db.session.flush()  # Flush to ensure payments are deleted before participants
             current_app.logger.debug(f'Deleted {payments_deleted} settlement payments')
 
             # 4. Delete expense shares (they reference both expenses and participants)

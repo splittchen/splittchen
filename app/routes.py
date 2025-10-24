@@ -951,13 +951,19 @@ def settle_group(share_token):
             operation_description="group settlement database operations"
         )
         
+        # Query SettlementPayment records for email links
+        from app.models import SettlementPayment
+        settlement_payments = SettlementPayment.query.filter_by(
+            settlement_period_id=settlement_data['settlement_period_id']
+        ).all()
+
         # Send final reports to all participants (outside transaction)
         from app.utils import send_final_settlement_report
-        
+
         success_count = 0
         failed_reasons = []
         no_email_count = 0
-        
+
         for participant in group.participants:
             if participant.email:
                 success, message = send_final_settlement_report(
@@ -971,7 +977,8 @@ def settle_group(share_token):
                     is_period_settlement=False,  # This is a final settlement
                     group_id=group.id,
                     participant_id=participant.id,
-                    share_token=group.share_token
+                    share_token=group.share_token,
+                    settlement_payments=settlement_payments
                 )
                 if success:
                     success_count += 1
@@ -1118,11 +1125,16 @@ def settle_only_group(share_token):
             settlement_time = time(hour=23, minute=59)
             group.next_settlement_date = dt.combine(next_settlement, settlement_time)
 
+        # Query SettlementPayment records for email links
+        settlement_payments = SettlementPayment.query.filter_by(
+            settlement_period_id=settlement_period.id
+        ).all()
+
         # Send report to each participant
         success_count = 0
         failed_reasons = []
         no_email_count = 0
-        
+
         for participant in group.participants:
             if participant.email:
                 success, message = send_final_settlement_report(
@@ -1136,7 +1148,8 @@ def settle_only_group(share_token):
                     is_period_settlement=True,  # Flag to indicate this is a period settlement
                     group_id=group.id,
                     participant_id=participant.id,
-                    share_token=group.share_token
+                    share_token=group.share_token,
+                    settlement_payments=settlement_payments
                 )
                 if success:
                     success_count += 1
@@ -1485,12 +1498,12 @@ def delete_group(share_token):
         flash(f'Group "{group.name}" has already been deleted.', 'info')
         return redirect(url_for('main.index'))
 
-    # Check for unpaid settlement payments
+    # Check for unpaid settlement payments in the latest period only
     from app.models import SettlementPayment
-    period_ids = [period.id for period in group.settlement_periods]
-    if period_ids:
+    if group.settlement_periods:
+        latest_period = group.settlement_periods[-1]  # Get the most recent settlement period
         unpaid_count = SettlementPayment.query.filter(
-            SettlementPayment.settlement_period_id.in_(period_ids),
+            SettlementPayment.settlement_period_id == latest_period.id,
             SettlementPayment.is_paid == False
         ).count()
 
