@@ -1251,28 +1251,37 @@ def confirm_payment(payment_id):
         flash('Participant session expired. Please rejoin the group.', 'error')
         return redirect(url_for('main.join_group', share_token=share_token))
 
-    # Check if already paid
-    if payment.is_paid:
-        flash('This payment has already been marked as paid.', 'info')
-        return redirect(url_for('main.view_group', share_token=share_token))
-
     try:
-        # Mark payment as paid
-        payment.mark_as_paid(confirmed_by_participant_id=participant.id)
+        # Use database-level row locking to prevent race conditions
+        # Re-query with FOR UPDATE lock to ensure atomic check-and-set
+        payment_locked = db.session.query(SettlementPayment).filter_by(id=payment_id).with_for_update().first()
+        
+        if not payment_locked:
+            flash('Payment not found.', 'error')
+            return redirect(url_for('main.view_group', share_token=share_token))
+        
+        # Check if already paid (now within locked transaction)
+        if payment_locked.is_paid:
+            db.session.rollback()  # Release lock
+            flash('This payment has already been marked as paid.', 'info')
+            return redirect(url_for('main.view_group', share_token=share_token))
+
+        # Mark payment as paid (atomic operation)
+        payment_locked.mark_as_paid(confirmed_by_participant_id=participant.id)
 
         # Create audit log entry
-        from_participant_name = payment.from_participant.name
-        to_participant_name = payment.to_participant.name
+        from_participant_name = payment_locked.from_participant.name
+        to_participant_name = payment_locked.to_participant.name
         audit_log = AuditLog(
             group_id=group.id,
             action='payment_confirmed',
-            description=f'{participant.name} confirmed payment: {from_participant_name} → {to_participant_name} ({format_currency(payment.amount, payment.currency)})',
+            description=f'{participant.name} confirmed payment: {from_participant_name} → {to_participant_name} ({format_currency(payment_locked.amount, payment_locked.currency)})',
             details={
-                'payment_id': payment.id,
-                'from_participant_id': payment.from_participant_id,
-                'to_participant_id': payment.to_participant_id,
-                'amount': float(payment.amount),
-                'currency': payment.currency,
+                'payment_id': payment_locked.id,
+                'from_participant_id': payment_locked.from_participant_id,
+                'to_participant_id': payment_locked.to_participant_id,
+                'amount': float(payment_locked.amount),
+                'currency': payment_locked.currency,
                 'confirmed_by': participant.name
             },
             performed_by=participant.name,
@@ -1282,13 +1291,13 @@ def confirm_payment(payment_id):
 
         db.session.commit()
 
-        flash(f'Payment confirmed: {from_participant_name} → {to_participant_name} ({format_currency(payment.amount, payment.currency)})', 'success')
+        flash(f'Payment confirmed: {from_participant_name} → {to_participant_name} ({format_currency(payment_locked.amount, payment_locked.currency)})', 'success')
 
         # Broadcast payment update via WebSocket
         from app.socketio_events.group_events import broadcast_balance_updated
         broadcast_balance_updated(share_token, {
             'payment_confirmed': {
-                'payment_id': payment.id,
+                'payment_id': payment_locked.id,
                 'is_paid': True
             }
         })
@@ -1316,30 +1325,37 @@ def toggle_payment_status(payment_id):
         abort(403)
 
     try:
-        # Toggle payment status
-        was_paid = payment.is_paid
+        # Use database-level row locking to prevent race conditions
+        payment_locked = db.session.query(SettlementPayment).filter_by(id=payment_id).with_for_update().first()
+        
+        if not payment_locked:
+            flash('Payment not found.', 'error')
+            return redirect(url_for('main.view_group', share_token=share_token))
+        
+        # Toggle payment status (now within locked transaction)
+        was_paid = payment_locked.is_paid
         if was_paid:
-            payment.mark_as_unpaid()
+            payment_locked.mark_as_unpaid()
             action_desc = 'marked as unpaid'
         else:
             # Admin override - mark as paid by admin
             admin_participant = Participant.query.filter_by(group_id=group.id, is_admin=True).first()
-            payment.mark_as_paid(confirmed_by_participant_id=admin_participant.id if admin_participant else None)
+            payment_locked.mark_as_paid(confirmed_by_participant_id=admin_participant.id if admin_participant else None)
             action_desc = 'marked as paid'
 
         # Create audit log entry
-        from_participant_name = payment.from_participant.name
-        to_participant_name = payment.to_participant.name
+        from_participant_name = payment_locked.from_participant.name
+        to_participant_name = payment_locked.to_participant.name
         audit_log = AuditLog(
             group_id=group.id,
             action='payment_status_toggled',
-            description=f'Admin {action_desc} payment: {from_participant_name} → {to_participant_name} ({format_currency(payment.amount, payment.currency)})',
+            description=f'Admin {action_desc} payment: {from_participant_name} → {to_participant_name} ({format_currency(payment_locked.amount, payment_locked.currency)})',
             details={
-                'payment_id': payment.id,
-                'from_participant_id': payment.from_participant_id,
-                'to_participant_id': payment.to_participant_id,
-                'amount': float(payment.amount),
-                'currency': payment.currency,
+                'payment_id': payment_locked.id,
+                'from_participant_id': payment_locked.from_participant_id,
+                'to_participant_id': payment_locked.to_participant_id,
+                'amount': float(payment_locked.amount),
+                'currency': payment_locked.currency,
                 'previous_status': 'paid' if was_paid else 'unpaid',
                 'new_status': 'unpaid' if was_paid else 'paid'
             },
@@ -1355,8 +1371,8 @@ def toggle_payment_status(payment_id):
         from app.socketio_events.group_events import broadcast_balance_updated
         broadcast_balance_updated(share_token, {
             'payment_updated': {
-                'payment_id': payment.id,
-                'is_paid': payment.is_paid
+                'payment_id': payment_locked.id,
+                'is_paid': payment_locked.is_paid
             }
         })
 

@@ -926,6 +926,10 @@ def _minimize_transactions(balances: Dict[int, float]) -> list:
         creditor_id = max(working_balances.items(), key=lambda x: x[1])[0]
         creditor_amount = working_balances[creditor_id]
         
+        # Safety check: prevent same participant being both debtor and creditor
+        if debtor_id == creditor_id:
+            break
+        
         # Skip if no valid debtor or creditor
         if debtor_amount < 0.01 or creditor_amount < 0.01:
             break
