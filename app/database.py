@@ -1,4 +1,9 @@
-"""Database initialization and management utilities."""
+"""Database initialization and management utilities.
+
+Handles database connection retry logic and table creation for PostgreSQL
+and SQLite backends. Implements graceful retry mechanism for containerized
+deployments where database may not be immediately available.
+"""
 
 import time
 from flask import current_app
@@ -6,7 +11,16 @@ from app import db
 
 
 def init_database():
-    """Initialize database tables if they don't exist."""
+    """Initialize database tables if they don't exist.
+    
+    Implements retry logic for database connection (useful in Docker Compose
+    where PostgreSQL may take time to become ready). Creates all SQLAlchemy
+    models if tables don't exist, or connects to existing schema.
+    
+    Raises:
+        Exception: If database connection fails after max_retries or if
+                  table creation fails for reasons other than race conditions
+    """
     max_retries = 30  # 30 seconds total
     retry_delay = 1   # 1 second between retries
     

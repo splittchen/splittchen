@@ -1638,7 +1638,8 @@ def delete_group(share_token):
         # Try to return to admin panel if group still exists
         try:
             return redirect(url_for('main.admin_panel', admin_token=group.admin_token))
-        except:
+        except Exception:
+            # Fallback to index if admin panel redirect fails
             return redirect(url_for('main.index'))
 
 
