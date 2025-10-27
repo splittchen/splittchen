@@ -51,8 +51,7 @@ Write-Host ""
 Write-Host "Test 4: Checking documentation..." -ForegroundColor Yellow
 $docs = @(
     "MULTIARCH.md",
-    "MULTIARCH-QUICK-REF.md",
-    "MULTIARCH-SUMMARY.md"
+    "MULTIARCH-QUICKREF.md"
 )
 foreach ($doc in $docs) {
     if (Test-Path $doc) {
