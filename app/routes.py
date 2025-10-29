@@ -126,6 +126,43 @@ def index() -> Any:
     return render_template('index.html', user_groups=user_groups)
 
 
+@main.route('/robots.txt')
+def robots_txt() -> tuple:
+    """Serve robots.txt for search engine crawlers.
+    
+    When SEO_ENABLED=true, allows indexing and provides sitemap.
+    When SEO_ENABLED=false, blocks all crawlers to prevent indexing.
+    """
+    from .seo import get_robots_txt
+    from flask import current_app
+    
+    content = get_robots_txt(
+        seo_enabled=current_app.config.get('SEO_ENABLED', False),
+        base_url=current_app.config.get('BASE_URL', 'http://localhost:5000')
+    )
+    return content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
+
+@main.route('/sitemap.xml')
+def sitemap_xml() -> tuple:
+    """Serve XML sitemap for search engines.
+    
+    Includes all publicly accessible pages.
+    Group-specific pages are not included as they require authentication tokens.
+    """
+    from .seo import generate_sitemap_xml
+    from flask import current_app
+    from .models import Group
+    
+    groups = []  # Future: could include public groups if needed
+    
+    content = generate_sitemap_xml(
+        groups=groups,
+        base_url=current_app.config.get('BASE_URL', 'http://localhost:5000')
+    )
+    return content, 200, {'Content-Type': 'application/xml; charset=utf-8'}
+
+
 @main.route('/p/<access_token>')
 def participant_access(access_token: str) -> Any:
     """Direct participant access via unique token."""

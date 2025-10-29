@@ -71,4 +71,17 @@ class Config:
         config['SCHEDULER_SETTLEMENT_TIME'] = os.environ.get('SCHEDULER_SETTLEMENT_TIME', '23:30')
         config['SCHEDULER_REMINDER_TIME'] = os.environ.get('SCHEDULER_REMINDER_TIME', '09:00')
         
+        # SEO Configuration (disabled by default for compatibility)
+        config['SEO_ENABLED'] = os.environ.get('SEO_ENABLED', 'false').lower() == 'true'
+        config['SEO_SITE_NAME'] = os.environ.get('SEO_SITE_NAME', 'Splittchen')
+        config['SEO_DESCRIPTION'] = os.environ.get(
+            'SEO_DESCRIPTION',
+            'Splittchen - Split expenses effortlessly. Create groups, add expenses, and settle up with friends, no registration required.'
+        )
+        config['SEO_KEYWORDS'] = os.environ.get(
+            'SEO_KEYWORDS',
+            'split expenses, split bills, expense splitter, group expenses, bill splitting app'
+        )
+        config['SEO_IMAGE_URL'] = os.environ.get('SEO_IMAGE_URL', '')
+        
         return config

@@ -6,6 +6,32 @@
     <meta name="theme-color" content="#16a34a">
     <title>{% block title %}Splittchen - Simple Expense Splitting{% endblock %}</title>
     
+    <!-- SEO Meta Tags (when SEO_ENABLED=true) -->
+    {% if config.SEO_ENABLED %}
+        <meta name="description" content="{{ config.SEO_DESCRIPTION }}">
+        <meta name="keywords" content="{{ config.SEO_KEYWORDS }}">
+        <meta name="author" content="{{ config.SEO_SITE_NAME }}">
+        <link rel="canonical" href="{{ request.base_url.rstrip('/') + request.path }}">
+        
+        <!-- Open Graph Tags (Facebook, LinkedIn, etc.) -->
+        <meta property="og:title" content="{% block og_title %}{{ config.SEO_SITE_NAME }}{% endblock %}">
+        <meta property="og:description" content="{{ config.SEO_DESCRIPTION }}">
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="{{ request.base_url.rstrip('/') + request.path }}">
+        {% if config.SEO_IMAGE_URL %}
+            <meta property="og:image" content="{{ config.SEO_IMAGE_URL }}">
+            <meta property="og:image:alt" content="{{ config.SEO_SITE_NAME }}">
+        {% endif %}
+        
+        <!-- Twitter Card Tags -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{% block twitter_title %}{{ config.SEO_SITE_NAME }}{% endblock %}">
+        <meta name="twitter:description" content="{{ config.SEO_DESCRIPTION }}">
+        {% if config.SEO_IMAGE_URL %}
+            <meta name="twitter:image" content="{{ config.SEO_IMAGE_URL }}">
+        {% endif %}
+    {% endif %}
+    
     <!-- Favicons -->
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
@@ -1025,6 +1051,42 @@
         }
     </style>
     
+    <!-- Structured Data (JSON-LD) for Search Engines -->
+    {% if config.SEO_ENABLED %}
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "{{ config.SEO_SITE_NAME }}",
+            "description": "{{ config.SEO_DESCRIPTION }}",
+            "url": "{{ config.BASE_URL }}",
+            "sameAs": ["https://github.com/splittchen/splittchen"]
+            {% if config.SEO_IMAGE_URL %}
+            , "logo": {
+                "@type": "ImageObject",
+                "url": "{{ config.SEO_IMAGE_URL }}",
+                "width": 200,
+                "height": 200
+            }
+            {% endif %}
+        }
+        </script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "{{ config.SEO_SITE_NAME }}",
+            "description": "{{ config.SEO_DESCRIPTION }}",
+            "url": "{{ config.BASE_URL }}",
+            "applicationCategory": "FinanceApplication",
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+            }
+        }
+        </script>
+    {% endif %}
 
 </head>
 <body>
