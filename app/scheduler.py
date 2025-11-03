@@ -168,7 +168,12 @@ def check_and_process_settlements():
                     locked_group = Group.query.filter_by(id=group.id).with_for_update().first()
                     if locked_group and locked_group.is_active and locked_group.expires_at:
                         # Double-check conditions after acquiring lock
-                        if locked_group.expires_at <= today:
+                        # Ensure timezone-aware comparison
+                        expires_at = locked_group.expires_at
+                        if expires_at.tzinfo is None:
+                            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+                        if expires_at <= today:
                             process_expiration_settlement(locked_group)
                             logger.info(f"Successfully processed expiration settlement for group: {locked_group.name}")
                         else:
@@ -187,11 +192,19 @@ def check_and_process_settlements():
                     locked_group = Group.query.filter_by(id=group.id).with_for_update().first()
                     if locked_group and locked_group.is_recurring and locked_group.is_active:
                         # Double-check conditions after acquiring lock
-                        if locked_group.next_settlement_date and locked_group.next_settlement_date <= today:
-                            process_automatic_settlement(locked_group)
-                            logger.info(f"Successfully processed recurring settlement for group: {locked_group.name}")
+                        if locked_group.next_settlement_date:
+                            # Ensure timezone-aware comparison
+                            settlement_date = locked_group.next_settlement_date
+                            if settlement_date.tzinfo is None:
+                                settlement_date = settlement_date.replace(tzinfo=timezone.utc)
+
+                            if settlement_date <= today:
+                                process_automatic_settlement(locked_group)
+                                logger.info(f"Successfully processed recurring settlement for group: {locked_group.name}")
+                            else:
+                                logger.info(f"Group {locked_group.name} no longer meets settlement criteria, skipping")
                         else:
-                            logger.info(f"Group {locked_group.name} no longer meets settlement criteria, skipping")
+                            logger.info(f"Group {locked_group.name} has no next_settlement_date, skipping")
                     else:
                         logger.info(f"Group {group.name} was modified by another process, skipping")
                 except Exception as e:
@@ -523,9 +536,9 @@ def process_expiration_settlement(group: Group):
 def update_next_settlement_date(group: Group):
     """Update the next settlement date for a recurring group."""
     import calendar
-    
+
     today = date.today()
-    
+
     # Calculate next month's last day
     if today.month == 12:
         next_month_year = today.year + 1
@@ -533,14 +546,17 @@ def update_next_settlement_date(group: Group):
     else:
         next_month_year = today.year
         next_month = today.month + 1
-    
+
     last_day_next = calendar.monthrange(next_month_year, next_month)[1]
     next_settlement = date(next_month_year, next_month, last_day_next)
+
+    # Create timezone-aware datetime to avoid comparison errors
     group.next_settlement_date = datetime.combine(
-        next_settlement, 
-        datetime.min.time().replace(hour=23, minute=59)
+        next_settlement,
+        datetime.min.time().replace(hour=23, minute=59),
+        tzinfo=timezone.utc
     )
-    
+
     logger.info(f"Updated next settlement date for {group.name} to {next_settlement}")
 
 
