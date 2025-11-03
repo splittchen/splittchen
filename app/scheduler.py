@@ -537,15 +537,20 @@ def update_next_settlement_date(group: Group):
     """Update the next settlement date for a recurring group."""
     import calendar
 
-    today = date.today()
+    # Use current settlement date as reference, not today
+    # This ensures we don't skip months when settlement runs early in the month
+    if group.next_settlement_date:
+        reference_date = group.next_settlement_date.date() if hasattr(group.next_settlement_date, 'date') else group.next_settlement_date
+    else:
+        reference_date = date.today()
 
-    # Calculate next month's last day
-    if today.month == 12:
-        next_month_year = today.year + 1
+    # Calculate next month's last day from the reference date
+    if reference_date.month == 12:
+        next_month_year = reference_date.year + 1
         next_month = 1
     else:
-        next_month_year = today.year
-        next_month = today.month + 1
+        next_month_year = reference_date.year
+        next_month = reference_date.month + 1
 
     last_day_next = calendar.monthrange(next_month_year, next_month)[1]
     next_settlement = date(next_month_year, next_month, last_day_next)
