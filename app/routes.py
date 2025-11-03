@@ -709,13 +709,13 @@ def add_expense(share_token):
             log_audit_action(
                 group_id=group.id,
                 action='expense_added',
-                description=f'Added expense "{expense.title}" (${expense.amount})',
+                description=f'Added expense "{expense.title}" ({expense.currency}{expense.original_amount})',
                 performed_by=participant.name,
                 performed_by_participant_id=participant.id if isinstance(participant.id, int) else None,
                 expense_id=expense.id,
                 details={
                     'expense_title': expense.title,
-                    'expense_amount': float(expense.amount),
+                    'expense_amount': float(expense.original_amount),
                     'expense_currency': expense.currency,
                     'paid_by_name': expense.paid_by.name,
                     'split_count': len(expense.expense_shares)
