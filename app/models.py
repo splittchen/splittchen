@@ -135,18 +135,18 @@ class Group(db.Model):
         """Calculate current balances for all participants."""
         from decimal import Decimal
         balances = {p.id: Decimal('0.0') for p in self.participants}
-        
+
         # Use group's currency if none specified
         if display_currency is None:
             display_currency = self.currency
-        
+
         for expense in self.expenses:
             # Skip archived expenses - they are part of settlement history
             if expense.is_archived:
                 continue
             # Calculate amounts in display currency
             from app.currency import currency_service
-            
+
             # Convert from group currency to display currency
             converted_paid = currency_service.convert_amount(
                 expense.amount, self.currency, display_currency
@@ -154,18 +154,90 @@ class Group(db.Model):
             if converted_paid is None:
                 # Fallback to base currency amount if conversion fails
                 converted_paid = expense.amount
-            
+
             # Subtract amount paid by participant
             if expense.paid_by_id in balances:
                 balances[expense.paid_by_id] += converted_paid
-            
+
             # Add amount owed by each participant (split equally for now)
             share_count = Decimal(len(expense.expense_shares))  # type: ignore
             share_amount = converted_paid / share_count
             for share in expense.expense_shares:  # type: ignore
                 balances[share.participant_id] -= share_amount
-                
+
         return balances
+
+    def get_unpaid_settlement_balances(self, display_currency: Optional[str] = None) -> Dict[int, Decimal]:
+        """
+        Calculate balances from unpaid settlements only.
+
+        This tracks who still owes money from previous settlement periods.
+        Returns participant balances based on unpaid SettlementPayment records.
+
+        Returns:
+            Dict mapping participant_id to their balance from unpaid settlements
+            (positive = owed to them, negative = they owe)
+        """
+        from decimal import Decimal
+        balances = {p.id: Decimal('0.0') for p in self.participants}
+
+        # Use group's currency if none specified
+        if display_currency is None:
+            display_currency = self.currency
+
+        # Query all unpaid settlement payments for this group
+        unpaid_payments = db.session.query(SettlementPayment).join(
+            SettlementPeriod, SettlementPayment.settlement_period_id == SettlementPeriod.id
+        ).filter(
+            SettlementPeriod.group_id == self.id,
+            SettlementPayment.is_paid == False
+        ).all()
+
+        # Calculate balances from unpaid payments
+        for payment in unpaid_payments:
+            # Convert amount if needed
+            from app.currency import currency_service
+            converted_amount = currency_service.convert_amount(
+                payment.amount, payment.currency, display_currency
+            )
+            if converted_amount is None:
+                converted_amount = Decimal(str(payment.amount))
+
+            # Debtor owes this amount (negative balance)
+            if payment.from_participant_id in balances:
+                balances[payment.from_participant_id] -= converted_amount
+
+            # Creditor is owed this amount (positive balance)
+            if payment.to_participant_id in balances:
+                balances[payment.to_participant_id] += converted_amount
+
+        return balances
+
+    def get_combined_balances(self, display_currency: Optional[str] = None) -> Dict[int, Decimal]:
+        """
+        Calculate combined balances (current expenses + unpaid settlements).
+
+        Returns total balance showing both:
+        - Outstanding settlements from previous periods (unpaid)
+        - Current month expenses (not yet settled)
+
+        Returns:
+            Dict mapping participant_id to combined balance
+        """
+        from decimal import Decimal
+
+        current_balances = self.get_balances(display_currency)
+        unpaid_settlement_balances = self.get_unpaid_settlement_balances(display_currency)
+
+        # Combine both balances
+        combined = {p.id: Decimal('0.0') for p in self.participants}
+        for participant_id in combined.keys():
+            combined[participant_id] = (
+                current_balances.get(participant_id, Decimal('0.0')) +
+                unpaid_settlement_balances.get(participant_id, Decimal('0.0'))
+            )
+
+        return combined
     
     def delete_group(self):
         """

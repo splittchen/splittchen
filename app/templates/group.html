@@ -296,11 +296,46 @@
             
             <div class="row">
                 <div class="col-md-6 mb-4">
+                    {# Check if there are unpaid settlements #}
+                    {% set has_unpaid_settlements = unpaid_settlement_balances and unpaid_settlement_balances.values()|sum|abs > 0.01 %}
+
+                    {% if has_unpaid_settlements %}
+                        {# Unpaid Settlements Section - Urgent Warning Banner #}
+                        <div class="card border-danger mb-3">
+                            <div class="card-header bg-danger bg-opacity-10 border-danger">
+                                <h5 class="mb-0 text-danger">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Outstanding Settlements
+                                </h5>
+                                <small class="text-muted">From previous settlement periods</small>
+                            </div>
+                            <div class="card-body">
+                                {% for participant in participants %}
+                                    {% set unpaid_balance = unpaid_settlement_balances.get(participant.id, 0) %}
+                                    {% if unpaid_balance|abs > 0.01 %}
+                                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom balance-item">
+                                            <div class="d-flex align-items-center">
+                                                <span class="participant-color" data-color="{{ participant.color }}"></span>
+                                                <span>{{ participant.name }}</span>
+                                            </div>
+                                            <span class="fw-bold {% if unpaid_balance > 0 %}balance-positive{% elif unpaid_balance < 0 %}balance-negative{% else %}balance-zero{% endif %}">
+                                                {{ format_currency_suffix(unpaid_balance, display_currency) }}
+                                            </span>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {# Current Month Balances Section #}
                     <div class="card">
                         <div class="card-header">
                             <h5 class="mb-0">
-                                <i class="bi bi-wallet me-2"></i>Current Balances
+                                <i class="bi bi-wallet me-2"></i>Current Month Balances
                             </h5>
+                            {% if has_unpaid_settlements %}
+                                <small class="text-muted">New expenses not yet settled</small>
+                            {% endif %}
                         </div>
                         <div class="card-body">
                             {% if balances %}
@@ -321,6 +356,33 @@
                             {% endif %}
                         </div>
                     </div>
+
+                    {# Combined Total Balance - Only show if unpaid settlements exist #}
+                    {% if has_unpaid_settlements %}
+                        <div class="card border-primary mt-3">
+                            <div class="card-header bg-primary bg-opacity-10 border-primary">
+                                <h6 class="mb-0 text-primary">
+                                    <i class="bi bi-calculator me-2"></i>Total Balance (Old + New)
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                {% for participant in participants %}
+                                    {% set combined_balance = combined_balances.get(participant.id, 0) %}
+                                    {% if combined_balance|abs > 0.01 %}
+                                        <div class="d-flex justify-content-between align-items-center py-1 balance-item">
+                                            <div class="d-flex align-items-center">
+                                                <span class="participant-color" data-color="{{ participant.color }}"></span>
+                                                <span><small>{{ participant.name }}</small></span>
+                                            </div>
+                                            <span class="fw-bold {% if combined_balance > 0 %}balance-positive{% elif combined_balance < 0 %}balance-negative{% else %}balance-zero{% endif %}">
+                                                <small>{{ format_currency_suffix(combined_balance, display_currency) }}</small>
+                                            </span>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
                 
                 <div class="col-md-6 mb-4">

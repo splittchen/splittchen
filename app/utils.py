@@ -664,8 +664,13 @@ def send_final_settlement_report(to_email: str, participant_name: str, group_nam
                                 participants: list, currency: str, is_period_settlement: bool = False,
                                 is_expiration_settlement: bool = False, is_deletion_settlement: bool = False,
                                 group_id: Optional[int] = None, participant_id: Optional[int] = None,
-                                share_token: Optional[str] = None, settlement_payments: Optional[list] = None) -> tuple[bool, str]:
-    """Send final settlement report email to participant."""
+                                share_token: Optional[str] = None, settlement_payments: Optional[list] = None,
+                                settled_expenses: Optional[list] = None) -> tuple[bool, str]:
+    """Send final settlement report email to participant.
+
+    Args:
+        settled_expenses: List of Expense objects that were settled (optional)
+    """
     base_url = current_app.config['BASE_URL']
     
     if is_period_settlement:
@@ -726,6 +731,46 @@ def send_final_settlement_report(to_email: str, participant_name: str, group_nam
         )
         for p in participants
     ])
+
+    # Build expense list table if expenses provided
+    expense_list_html = ""
+    if settled_expenses:
+        # Sort expenses by date (newest first)
+        sorted_expenses = sorted(settled_expenses, key=lambda e: e.date, reverse=True)
+        total_expenses_amount = sum(float(e.amount) for e in sorted_expenses)
+
+        expense_rows = "".join([
+            f'''<tr>
+                <td style="padding: 8px; border: 1px solid #e2e8f0; font-size: 14px;">{expense.date.strftime('%Y-%m-%d')}</td>
+                <td style="padding: 8px; border: 1px solid #e2e8f0; font-size: 14px;">{expense.title}</td>
+                <td style="padding: 8px; border: 1px solid #e2e8f0; font-size: 14px;">{next(p.name for p in participants if p.id == expense.paid_by_id)}</td>
+                <td style="padding: 8px; text-align: right; border: 1px solid #e2e8f0; font-weight: bold; font-size: 14px;">{format_currency(float(expense.amount), expense.currency)}</td>
+            </tr>'''
+            for expense in sorted_expenses
+        ])
+
+        expense_list_html = f'''
+            <h3 style="color: #16a34a; margin-top: 30px;">Settled Expenses ({len(sorted_expenses)} items)</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                <thead>
+                    <tr style="background: #f1f5f9;">
+                        <th style="padding: 10px; text-align: left; border: 1px solid #e2e8f0; font-size: 14px;">Date</th>
+                        <th style="padding: 10px; text-align: left; border: 1px solid #e2e8f0; font-size: 14px;">Description</th>
+                        <th style="padding: 10px; text-align: left; border: 1px solid #e2e8f0; font-size: 14px;">Paid By</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #e2e8f0; font-size: 14px;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {expense_rows}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8fafc; font-weight: bold;">
+                        <td colspan="3" style="padding: 10px; text-align: right; border: 1px solid #e2e8f0;">Total:</td>
+                        <td style="padding: 10px; text-align: right; border: 1px solid #e2e8f0;">{format_currency(total_expenses_amount, currency)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        '''
     
     # Build conditional content for HTML
     if is_period_settlement:
@@ -785,7 +830,9 @@ def send_final_settlement_report(to_email: str, participant_name: str, group_nam
                 </div>"""
                 for s in participant_settlements if s['to_participant_id'] == participant_id
             ]) + "</div>" if any(s['to_participant_id'] == participant_id for s in participant_settlements) else ""}
-            
+
+            {expense_list_html}
+
             {"""
             <div style="background: #f1f5f9; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #3b82f6;">
                 <h4 style="color: #1e40af; margin-top: 0;">Payment Instructions</h4>

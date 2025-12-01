@@ -557,10 +557,12 @@ def view_group(share_token: str) -> Any:
     
     # Get display currency from request or use group default
     display_currency = request.args.get('currency', group.currency)
-    
+
     balances = group.get_balances(display_currency)
+    unpaid_settlement_balances = group.get_unpaid_settlement_balances(display_currency)
+    combined_balances = group.get_combined_balances(display_currency)
     settlements = calculate_settlements(balances)
-    
+
     # Check if user is admin
     is_admin = verify_admin_access(share_token, group)
     
@@ -587,6 +589,8 @@ def view_group(share_token: str) -> Any:
                          expenses=expenses,
                          all_expenses=all_expenses,
                          balances=balances,
+                         unpaid_settlement_balances=unpaid_settlement_balances,
+                         combined_balances=combined_balances,
                          settlements=settlements,
                          participants=group.participants,
                          is_admin=is_admin,
@@ -1015,7 +1019,8 @@ def settle_group(share_token):
                     group_id=group.id,
                     participant_id=participant.id,
                     share_token=group.share_token,
-                    settlement_payments=settlement_payments
+                    settlement_payments=settlement_payments,
+                    settled_expenses=settlement_data['current_expenses']
                 )
                 if success:
                     success_count += 1
@@ -1175,7 +1180,8 @@ def settle_only_group(share_token):
                     group_id=group.id,
                     participant_id=participant.id,
                     share_token=group.share_token,
-                    settlement_payments=settlement_payments
+                    settlement_payments=settlement_payments,
+                    settled_expenses=current_expenses
                 )
                 if success:
                     success_count += 1

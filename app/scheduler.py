@@ -365,7 +365,8 @@ def process_automatic_settlement(group: Group):
                     is_period_settlement=True,
                     group_id=group.id,
                     participant_id=participant.id,
-                    share_token=group.share_token
+                    share_token=group.share_token,
+                    settled_expenses=active_expenses
                 )
                 if success:
                     success_count += 1
@@ -468,7 +469,8 @@ def process_expiration_settlement(group: Group):
                         is_expiration_settlement=True,
                         group_id=group.id,
                         participant_id=participant.id,
-                        share_token=group.share_token
+                        share_token=group.share_token,
+                        settled_expenses=active_expenses
                     )
                     if success:
                         success_count += 1
