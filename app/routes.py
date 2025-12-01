@@ -1148,19 +1148,8 @@ def settle_only_group(share_token):
 
         # Update next settlement date for recurring groups
         if group.is_recurring:
-            from datetime import time
-            import calendar
-            if today.month == 12:
-                next_month_year = today.year + 1
-                next_month = 1
-            else:
-                next_month_year = today.year
-                next_month = today.month + 1
-
-            last_day_next = calendar.monthrange(next_month_year, next_month)[1]
-            next_settlement = date(next_month_year, next_month, last_day_next)
-            settlement_time = time(hour=23, minute=59)
-            group.next_settlement_date = dt.combine(next_settlement, settlement_time)
+            from app.scheduler import update_next_settlement_date
+            update_next_settlement_date(group)
 
         # Query SettlementPayment records for email links
         settlement_payments = SettlementPayment.query.filter_by(
