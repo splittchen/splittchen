@@ -45,9 +45,9 @@ class Group(db.Model):
     creator_email = db.Column(db.String(120))  # Email of the group creator for admin access recovery
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     is_settled = db.Column(db.Boolean, default=False, nullable=False, index=True)
-    settled_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
-    expires_at = db.Column(db.DateTime)
+    settled_at = db.Column(db.DateTime(timezone=True))
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    expires_at = db.Column(db.DateTime(timezone=True))
     
     # Currency settings - keeping both for backward compatibility during migration
     default_currency = db.Column(db.String(3), default=get_default_currency, nullable=False)  # Group's preferred currency
@@ -67,7 +67,7 @@ class Group(db.Model):
     # Recurring settlement settings
     is_recurring = db.Column(db.Boolean, default=False, nullable=False)  # Enable auto-settlements
     recurrence_type = db.Column(db.String(20), default=None)  # 'monthly', 'weekly', etc.
-    next_settlement_date = db.Column(db.DateTime)  # When next auto-settlement should occur
+    next_settlement_date = db.Column(db.DateTime(timezone=True))  # When next auto-settlement should occur (UTC)
     
     # Relationships
     participants = db.relationship('Participant', back_populates='group', cascade='all, delete-orphan')
@@ -92,39 +92,48 @@ class Group(db.Model):
         return f'<Group {self.name}>'
     
     def set_next_settlement_date(self) -> None:
-        """Set next settlement date for recurring groups to end of current/next month."""
+        """Set next settlement date for recurring groups to end of current/next month.
+        
+        Always stores UTC-aware datetimes. Settlement is due at 22:00 UTC on the
+        last day of the month, ensuring the cron job (which runs at 23:00 local
+        European time = 22:00 UTC in winter / 21:00 UTC in summer) always fires
+        AFTER the settlement becomes due.
+        """
         if not self.is_recurring:
             return
             
-        from datetime import date, time
+        from datetime import date
         import calendar
         
         today = date.today()
-        # Set next settlement to last day of current month at 23:59
+        # Set next settlement to last day of current month
         last_day = calendar.monthrange(today.year, today.month)[1]
         next_settlement = date(today.year, today.month, last_day)
         
         # If we're already past the last day of this month, move to next month
         if today >= next_settlement:
             if today.month == 12:
-                next_settlement = date(today.year + 1, 1, 31)
-                if next_settlement.month != 1:  # Handle February case
-                    next_settlement = date(today.year + 1, 2, 28)
+                next_month_year = today.year + 1
+                next_month = 1
             else:
+                next_month_year = today.year
                 next_month = today.month + 1
-                last_day_next = calendar.monthrange(today.year, next_month)[1]
-                next_settlement = date(today.year, next_month, last_day_next)
+            last_day_next = calendar.monthrange(next_month_year, next_month)[1]
+            next_settlement = date(next_month_year, next_month, last_day_next)
         
-        # Create datetime for 23:59 on the settlement date
-        settlement_time = time(hour=23, minute=59)
-        self.next_settlement_date = datetime.combine(next_settlement, settlement_time)
+        # Store as UTC-aware datetime at 22:00 UTC (before any European cron time)
+        self.next_settlement_date = datetime(
+            next_settlement.year, next_settlement.month, next_settlement.day,
+            hour=22, minute=0, tzinfo=timezone.utc
+        )
     
     @property
     def is_expired(self) -> bool:
         """Check if group has expired."""
         if self.expires_at is None:
             return False
-        return datetime.now(timezone.utc) > self.expires_at.replace(tzinfo=timezone.utc)
+        expires = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) > expires
     
     @property
     def member_count(self) -> int:
@@ -367,9 +376,9 @@ class Participant(db.Model):
     email = db.Column(db.String(120))
     color = db.Column(db.String(7), default='#3B82F6')  # Default blue color
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
-    joined_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    joined_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     access_token = db.Column(db.String(40), unique=True, nullable=False, default=lambda: generate_token(32), index=True)
-    last_accessed = db.Column(db.DateTime, nullable=True)
+    last_accessed = db.Column(db.DateTime(timezone=True), nullable=True)
     
     # Foreign keys
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False, index=True)
@@ -449,9 +458,9 @@ class Expense(db.Model):
     description = db.Column(db.Text)
     amount = db.Column(db.Numeric(15, 2), nullable=False)  # Increased precision for larger amounts
     category = db.Column(db.String(50), default='general')
-    date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    date = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     split_type = db.Column(db.String(20), default='EQUAL', nullable=False)  # Currently only EQUAL supported
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     # Currency support
     currency = db.Column(db.String(3), default=get_default_currency, nullable=False)          # Original currency
@@ -527,7 +536,7 @@ class SettlementPeriod(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     period_name = db.Column(db.String(20), nullable=False)  # e.g., '2024-09'
-    settled_at = db.Column(db.DateTime, nullable=False, index=True)
+    settled_at = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
     total_amount = db.Column(db.Numeric(15, 2))  # Total expenses for this period
     participant_count = db.Column(db.Integer)  # Number of participants at settlement
 
@@ -560,8 +569,8 @@ class SettlementPayment(db.Model):
     amount = db.Column(db.Numeric(15, 2), nullable=False)  # Payment amount
     currency = db.Column(db.String(3), nullable=False)  # Payment currency
     is_paid = db.Column(db.Boolean, default=False, nullable=False, index=True)  # Payment confirmation status
-    paid_at = db.Column(db.DateTime)  # When payment was confirmed
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    paid_at = db.Column(db.DateTime(timezone=True))  # When payment was confirmed
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 
     # Foreign keys
     settlement_period_id = db.Column(db.Integer, db.ForeignKey('settlement_periods.id'), nullable=False, index=True)
@@ -611,7 +620,7 @@ class KnownEmail(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     name = db.Column(db.String(100))
     usage_count = db.Column(db.Integer, default=1, nullable=False, index=True)
-    last_used = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    last_used = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     def __init__(self, email: str, name: Optional[str] = None, usage_count: int = 1, **kwargs):
         """Initialize KnownEmail instance."""
@@ -632,7 +641,7 @@ class ExchangeRate(db.Model):
     from_currency = db.Column(db.String(3), nullable=False, index=True)
     to_currency = db.Column(db.String(3), nullable=False, index=True)
     rate = db.Column(db.Numeric(12, 6), nullable=False)  # Exchange rate with high precision
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     # Composite unique constraint
     __table_args__ = (db.UniqueConstraint('from_currency', 'to_currency', name='unique_currency_pair'),)
@@ -643,7 +652,8 @@ class ExchangeRate(db.Model):
     @property
     def is_stale(self) -> bool:
         """Check if exchange rate is older than 1 hour."""
-        return (datetime.now(timezone.utc) - self.updated_at.replace(tzinfo=timezone.utc)).total_seconds() > 3600
+        updated = self.updated_at if self.updated_at.tzinfo else self.updated_at.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - updated).total_seconds() > 3600
 
 
 class AuditLog(db.Model):
@@ -656,7 +666,7 @@ class AuditLog(db.Model):
     details = db.Column(db.JSON)  # Additional structured data
     performed_by = db.Column(db.String(100))  # Name of user who performed action
     performed_by_participant_id = db.Column(db.Integer, db.ForeignKey('participants.id', ondelete='SET NULL'), index=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     # Foreign keys
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False, index=True)
@@ -696,7 +706,7 @@ class EmailLog(db.Model):
     email_address = db.Column(db.String(120), nullable=False, index=True)  # Recipient email
     email_type = db.Column(db.String(50), nullable=False, index=True)  # 'invitation', 'settlement', 'reminder', 'group_created'
     success = db.Column(db.Boolean, nullable=False, index=True)  # Whether email was sent successfully
-    sent_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    sent_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     # Optional foreign keys for tracking context
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True, index=True)

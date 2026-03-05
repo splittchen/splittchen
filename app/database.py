@@ -10,6 +10,61 @@ from flask import current_app
 from app import db
 
 
+def _migrate_to_timestamptz():
+    """Migrate timestamp columns to timestamptz on PostgreSQL.
+    
+    Idempotent: only alters columns that are still 'timestamp without time zone'.
+    Assumes existing naive timestamps are UTC (which is the application convention).
+    """
+    db_url = str(db.engine.url)
+    if 'postgresql' not in db_url and 'postgres' not in db_url:
+        return  # Only needed for PostgreSQL; SQLite has no distinction
+
+    # All (table, column) pairs that use DateTime(timezone=True) in models.py
+    columns_to_migrate = [
+        ('groups', 'created_at'),
+        ('groups', 'settled_at'),
+        ('groups', 'expires_at'),
+        ('groups', 'next_settlement_date'),
+        ('participants', 'joined_at'),
+        ('participants', 'last_accessed'),
+        ('expenses', 'date'),
+        ('expenses', 'created_at'),
+        ('settlement_periods', 'settled_at'),
+        ('settlement_payments', 'paid_at'),
+        ('settlement_payments', 'created_at'),
+        ('known_emails', 'last_used'),
+        ('exchange_rates', 'updated_at'),
+        ('audit_logs', 'created_at'),
+        ('email_logs', 'sent_at'),
+    ]
+
+    migrated = 0
+    for table, column in columns_to_migrate:
+        try:
+            # Check current column type via information_schema
+            result = db.session.execute(db.text(
+                "SELECT data_type FROM information_schema.columns "
+                "WHERE table_name = :table AND column_name = :col"
+            ), {'table': table, 'col': column})
+            row = result.fetchone()
+            if row and row[0] == 'timestamp without time zone':
+                db.session.execute(db.text(
+                    f'ALTER TABLE "{table}" ALTER COLUMN "{column}" '
+                    f'TYPE TIMESTAMPTZ USING "{column}" AT TIME ZONE \'UTC\''
+                ))
+                migrated += 1
+                current_app.logger.info(f"Migrated {table}.{column} to TIMESTAMPTZ")
+        except Exception as e:
+            current_app.logger.warning(f"Could not migrate {table}.{column}: {e}")
+
+    if migrated > 0:
+        db.session.commit()
+        current_app.logger.info(f"TIMESTAMPTZ migration complete: {migrated} column(s) converted")
+    else:
+        current_app.logger.info("TIMESTAMPTZ migration: all columns already up to date")
+
+
 def init_database():
     """Initialize database tables if they don't exist.
     
@@ -30,6 +85,7 @@ def init_database():
             from app.models import Group
             db.session.execute(db.text("SELECT 1 FROM groups LIMIT 1"))
             current_app.logger.info("Database tables already exist")
+            _migrate_to_timestamptz()
             return
         except Exception as e:
             # Check if this is a connection error (database not ready yet)

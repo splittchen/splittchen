@@ -34,9 +34,9 @@ def create_scheduler(settlement_time='23:30', reminder_time='09:00'):
         scheduler = BackgroundScheduler(
             executors=executors,
             job_defaults={
-                'coalesce': False,
+                'coalesce': True,
                 'max_instances': 1,
-                'misfire_grace_time': 30
+                'misfire_grace_time': 3600  # 1 hour grace period to avoid silent drops
             }
         )
         
@@ -96,6 +96,15 @@ def stop_scheduler():
         logger.info("Background scheduler stopped")
 
 
+def _ensure_utc(dt_value):
+    """Ensure a datetime is timezone-aware (UTC). Handles legacy naive datetimes."""
+    if dt_value is None:
+        return None
+    if dt_value.tzinfo is None:
+        return dt_value.replace(tzinfo=timezone.utc)
+    return dt_value
+
+
 def check_and_process_settlements():
     """Check for groups with due settlements and expired groups, then process them."""
     logger.info("=" * 60)
@@ -109,15 +118,15 @@ def check_and_process_settlements():
         # Create application context for database operations
         app, _ = create_app()  # Unpack tuple (app, socketio)
         with app.app_context():
-            today = datetime.now(timezone.utc)
-            logger.info(f"Current UTC time: {today.isoformat()}")
+            now = datetime.now(timezone.utc)
+            logger.info(f"Current UTC time: {now.isoformat()}")
 
             # Find all expired groups first (they take priority over recurring settlements)
             logger.info("Searching for expired groups...")
             expired_groups = Group.query.filter(
                 Group.is_active.is_(True),
                 Group.expires_at != None,
-                Group.expires_at <= today
+                Group.expires_at <= now
             ).all()
 
             logger.info(f"Found {len(expired_groups)} expired groups")
@@ -140,40 +149,32 @@ def check_and_process_settlements():
 
             all_due_candidates = due_groups_query.all()
 
-            # Filter by date comparison (handle timezone-aware and timezone-naive datetimes)
+            # Filter by date comparison
             due_groups = []
             for group in all_due_candidates:
                 if group.next_settlement_date:
-                    # Make both datetimes timezone-aware for comparison
-                    settlement_date = group.next_settlement_date
-                    if settlement_date.tzinfo is None:
-                        settlement_date = settlement_date.replace(tzinfo=timezone.utc)
+                    settlement_date = _ensure_utc(group.next_settlement_date)
 
                     logger.info(f"Checking group '{group.name}' (ID: {group.id})")
                     logger.info(f"  - next_settlement_date: {settlement_date.isoformat()}")
-                    logger.info(f"  - current time: {today.isoformat()}")
-                    logger.info(f"  - is due: {settlement_date <= today}")
+                    logger.info(f"  - current time: {now.isoformat()}")
+                    logger.info(f"  - is due: {settlement_date <= now}")
 
-                    if settlement_date <= today:
+                    if settlement_date <= now:
                         due_groups.append(group)
 
             logger.info(f"Found {len(due_groups)} recurring groups with due settlements")
             for group in due_groups:
-                logger.info(f"  - {group.name} (ID: {group.id}, next_settlement: {group.next_settlement_date.isoformat() if group.next_settlement_date else 'None'})")
+                settlement_date = _ensure_utc(group.next_settlement_date)
+                logger.info(f"  - {group.name} (ID: {group.id}, next_settlement: {settlement_date.isoformat()})")
             
             # Process expired groups FIRST (they take priority and close permanently)
             for group in expired_groups:
                 try:
-                    # Lock group for update to prevent race conditions
                     locked_group = Group.query.filter_by(id=group.id).with_for_update().first()
                     if locked_group and locked_group.is_active and locked_group.expires_at:
-                        # Double-check conditions after acquiring lock
-                        # Ensure timezone-aware comparison
-                        expires_at = locked_group.expires_at
-                        if expires_at.tzinfo is None:
-                            expires_at = expires_at.replace(tzinfo=timezone.utc)
-
-                        if expires_at <= today:
+                        expires_at = _ensure_utc(locked_group.expires_at)
+                        if expires_at <= now:
                             process_expiration_settlement(locked_group)
                             logger.info(f"Successfully processed expiration settlement for group: {locked_group.name}")
                         else:
@@ -182,23 +183,16 @@ def check_and_process_settlements():
                         logger.info(f"Group {group.name} was modified by another process, skipping")
                 except Exception as e:
                     logger.error(f"Error processing expiration settlement for group {group.name}: {e}")
-                    # Continue processing other groups even if one fails
                     continue
             
             # Then process recurring settlements (for groups that haven't expired)
             for group in due_groups:
                 try:
-                    # Lock group for update to prevent race conditions
                     locked_group = Group.query.filter_by(id=group.id).with_for_update().first()
                     if locked_group and locked_group.is_recurring and locked_group.is_active:
-                        # Double-check conditions after acquiring lock
                         if locked_group.next_settlement_date:
-                            # Ensure timezone-aware comparison
-                            settlement_date = locked_group.next_settlement_date
-                            if settlement_date.tzinfo is None:
-                                settlement_date = settlement_date.replace(tzinfo=timezone.utc)
-
-                            if settlement_date <= today:
+                            settlement_date = _ensure_utc(locked_group.next_settlement_date)
+                            if settlement_date <= now:
                                 process_automatic_settlement(locked_group)
                                 logger.info(f"Successfully processed recurring settlement for group: {locked_group.name}")
                             else:
@@ -209,7 +203,6 @@ def check_and_process_settlements():
                         logger.info(f"Group {group.name} was modified by another process, skipping")
                 except Exception as e:
                     logger.error(f"Error processing recurring settlement for group {group.name}: {e}")
-                    # Continue processing other groups even if one fails
                     continue
             
             # Commit all changes
@@ -536,7 +529,11 @@ def process_expiration_settlement(group: Group):
 
 
 def update_next_settlement_date(group: Group):
-    """Update the next settlement date for a recurring group."""
+    """Update the next settlement date for a recurring group.
+    
+    Uses the current settlement date as reference to calculate next month's
+    last day. Always stores UTC-aware datetime at 22:00 UTC.
+    """
     import calendar
 
     # Use current settlement date as reference, not today
@@ -557,14 +554,13 @@ def update_next_settlement_date(group: Group):
     last_day_next = calendar.monthrange(next_month_year, next_month)[1]
     next_settlement = date(next_month_year, next_month, last_day_next)
 
-    # Create timezone-aware datetime to avoid comparison errors
-    group.next_settlement_date = datetime.combine(
-        next_settlement,
-        datetime.min.time().replace(hour=23, minute=59),
-        tzinfo=timezone.utc
+    # Store as UTC-aware datetime at 22:00 UTC (before any European cron time)
+    group.next_settlement_date = datetime(
+        next_settlement.year, next_settlement.month, next_settlement.day,
+        hour=22, minute=0, tzinfo=timezone.utc
     )
 
-    logger.info(f"Updated next settlement date for {group.name} to {next_settlement}")
+    logger.info(f"Updated next settlement date for {group.name} to {group.next_settlement_date.isoformat()}")
 
 
 def get_scheduler_status() -> dict:

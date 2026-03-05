@@ -6,6 +6,15 @@ from flask.cli import with_appcontext
 from datetime import datetime, timezone, timedelta
 
 
+def _ensure_utc(dt_value):
+    """Ensure a datetime is timezone-aware (UTC). Handles legacy naive datetimes."""
+    if dt_value is None:
+        return None
+    if dt_value.tzinfo is None:
+        return dt_value.replace(tzinfo=timezone.utc)
+    return dt_value
+
+
 @click.command()
 @with_appcontext
 def check_settlements():
@@ -51,7 +60,7 @@ def list_groups():
         # Determine overall status
         is_expired = False
         if group.expires_at:
-            expires_at = group.expires_at.replace(tzinfo=timezone.utc) if group.expires_at.tzinfo is None else group.expires_at
+            expires_at = _ensure_utc(group.expires_at)
             is_expired = expires_at <= now
 
         # Show status more clearly
@@ -71,11 +80,11 @@ def list_groups():
         click.echo(f"  Recurring: {group.is_recurring}")
 
         if group.expires_at:
-            expires_at = group.expires_at.replace(tzinfo=timezone.utc) if group.expires_at.tzinfo is None else group.expires_at
+            expires_at = _ensure_utc(group.expires_at)
             click.echo(f"  Expires At: {expires_at.isoformat()} {'(EXPIRED)' if is_expired else '(future)'}")
 
         if group.next_settlement_date:
-            settlement_date = group.next_settlement_date.replace(tzinfo=timezone.utc) if group.next_settlement_date.tzinfo is None else group.next_settlement_date
+            settlement_date = _ensure_utc(group.next_settlement_date)
             is_due = settlement_date <= now
             click.echo(f"  Next Settlement: {settlement_date.isoformat()} {'(DUE NOW)' if is_due else '(pending)'}")
 
@@ -122,7 +131,7 @@ def test_settlement(group_id, dry_run):
         ).all()
 
         for g in expired_groups:
-            expires_at = g.expires_at.replace(tzinfo=timezone.utc) if g.expires_at.tzinfo is None else g.expires_at
+            expires_at = _ensure_utc(g.expires_at)
             if expires_at <= now:
                 groups_to_test.append(('expired', g))
 
@@ -134,7 +143,7 @@ def test_settlement(group_id, dry_run):
         ).all()
 
         for g in recurring_groups:
-            settlement_date = g.next_settlement_date.replace(tzinfo=timezone.utc) if g.next_settlement_date.tzinfo is None else g.next_settlement_date
+            settlement_date = _ensure_utc(g.next_settlement_date)
             if settlement_date <= now:
                 groups_to_test.append(('recurring', g))
 
@@ -149,7 +158,7 @@ def test_settlement(group_id, dry_run):
             group = item
             # Determine type
             if group.expires_at:
-                expires_at = group.expires_at.replace(tzinfo=timezone.utc) if group.expires_at.tzinfo is None else group.expires_at
+                expires_at = _ensure_utc(group.expires_at)
                 if expires_at <= now:
                     settlement_type = 'expired'
                 else:
@@ -242,6 +251,72 @@ def set_expiration_date(share_token, days):
         click.echo(f"✗ Error: {e}")
 
 
+@click.command()
+@click.argument('share_token')
+@click.option('--year', type=int, required=True, help='Year of the missed settlement (e.g. 2026)')
+@click.option('--month', type=int, required=True, help='Month of the missed settlement (1-12)')
+@click.option('--dry-run', is_flag=True, help='Preview what would happen without making changes')
+@with_appcontext
+def trigger_missed_settlement(share_token, year, month, dry_run):
+    """Trigger a missed recurring settlement for a specific month.
+    
+    Sets next_settlement_date to last day of the given month at 22:00 UTC,
+    then runs the settlement check. This processes the missed period and
+    advances the schedule to the next month.
+    
+    Example: flask trigger-missed-settlement ABC123 --year 2026 --month 2
+    """
+    import calendar
+    from app.models import Group, db
+
+    group = Group.query.filter_by(share_token=share_token).first()
+    if not group:
+        click.echo(f"Error: Group not found with share token: {share_token}")
+        return
+
+    if not group.is_recurring:
+        click.echo(f"Error: Group '{group.name}' is not a recurring group")
+        return
+
+    if not group.is_active:
+        click.echo(f"Error: Group '{group.name}' is not active")
+        return
+
+    # Calculate last day of the target month at 22:00 UTC
+    last_day = calendar.monthrange(year, month)[1]
+    target_date = datetime(year, month, last_day, 22, 0, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+
+    if target_date > now:
+        click.echo(f"Error: Target date {target_date.isoformat()} is in the future")
+        return
+
+    active_expenses = [exp for exp in group.expenses if not exp.is_archived]
+    click.echo(f"Group: {group.name} (ID: {group.id})")
+    click.echo(f"  Current next_settlement_date: {_ensure_utc(group.next_settlement_date).isoformat() if group.next_settlement_date else 'None'}")
+    click.echo(f"  Will set to: {target_date.isoformat()}")
+    click.echo(f"  Active expenses: {len(active_expenses)}")
+    click.echo(f"  Participants: {len(group.participants)}")
+
+    if dry_run:
+        click.echo(f"  [DRY RUN] Would set next_settlement_date and trigger settlement check")
+        return
+
+    try:
+        group.next_settlement_date = target_date
+        db.session.commit()
+        click.echo(f"  ✓ Set next_settlement_date to {target_date.isoformat()}")
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f"  ✗ Error setting date: {e}")
+        return
+
+    click.echo("  Running settlement check...")
+    from app.scheduler import trigger_manual_settlement_check
+    trigger_manual_settlement_check()
+    click.echo("  ✓ Settlement check completed. Verify with 'flask list-groups'.")
+
+
 def register_cli_commands(app):
     """Register all CLI commands with the Flask app."""
     app.cli.add_command(check_settlements)
@@ -250,3 +325,4 @@ def register_cli_commands(app):
     app.cli.add_command(test_settlement)
     app.cli.add_command(set_settlement_date)
     app.cli.add_command(set_expiration_date)
+    app.cli.add_command(trigger_missed_settlement)
