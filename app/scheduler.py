@@ -554,10 +554,11 @@ def update_next_settlement_date(group: Group):
     last_day_next = calendar.monthrange(next_month_year, next_month)[1]
     next_settlement = date(next_month_year, next_month, last_day_next)
 
-    # Store as UTC-aware datetime at 22:00 UTC (before any European cron time)
+    # Store as UTC-aware datetime at 20:00 UTC (before any European cron time,
+    # even in summer: 23:00 CEST = 21:00 UTC > 20:00 UTC)
     group.next_settlement_date = datetime(
         next_settlement.year, next_settlement.month, next_settlement.day,
-        hour=22, minute=0, tzinfo=timezone.utc
+        hour=20, minute=0, tzinfo=timezone.utc
     )
 
     logger.info(f"Updated next settlement date for {group.name} to {group.next_settlement_date.isoformat()}")

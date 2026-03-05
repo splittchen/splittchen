@@ -284,7 +284,7 @@ def trigger_missed_settlement(share_token, year, month, dry_run):
 
     # Calculate last day of the target month at 22:00 UTC
     last_day = calendar.monthrange(year, month)[1]
-    target_date = datetime(year, month, last_day, 22, 0, tzinfo=timezone.utc)
+    target_date = datetime(year, month, last_day, 20, 0, tzinfo=timezone.utc)
     now = datetime.now(timezone.utc)
 
     if target_date > now:
