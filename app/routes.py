@@ -522,11 +522,11 @@ def view_group(share_token: str) -> Any:
         
         if not group_exists:
             # Add to recent groups (limit to 10 most recent)
-            from datetime import datetime
+            from datetime import datetime, timezone
             user_groups.insert(0, {
                 'share_token': share_token,
                 'admin_token': group.admin_token,
-                'accessed_at': datetime.utcnow().isoformat()
+                'accessed_at': datetime.now(timezone.utc).isoformat()
             })
             # Keep only the 10 most recent groups
             session['user_groups'] = user_groups[:10]

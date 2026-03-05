@@ -6,13 +6,8 @@ from flask.cli import with_appcontext
 from datetime import datetime, timezone, timedelta
 
 
-def _ensure_utc(dt_value):
-    """Ensure a datetime is timezone-aware (UTC). Handles legacy naive datetimes."""
-    if dt_value is None:
-        return None
-    if dt_value.tzinfo is None:
-        return dt_value.replace(tzinfo=timezone.utc)
-    return dt_value
+# Import shared helper
+from app.utils import ensure_utc as _ensure_utc
 
 
 @click.command()

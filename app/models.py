@@ -94,10 +94,10 @@ class Group(db.Model):
     def set_next_settlement_date(self) -> None:
         """Set next settlement date for recurring groups to end of current/next month.
         
-        Always stores UTC-aware datetimes. Settlement is due at 20:00 UTC on the
-        last day of the month, ensuring the cron job (which runs at 23:00 local
-        European time = 22:00 UTC in winter / 21:00 UTC in summer) always fires
-        AFTER the settlement becomes due.
+        Always stores UTC-aware datetimes. Settlement is due at 20:00 UTC on
+        the last day of the month, ensuring the cron job (which runs at 23:00
+        local European time = 22:00 UTC in winter / 21:00 UTC in summer)
+        always fires AFTER the settlement becomes due.
         """
         if not self.is_recurring:
             return

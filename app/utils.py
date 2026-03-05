@@ -5,6 +5,7 @@ import ssl
 import re
 import secrets
 import hashlib
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, Optional, Tuple, Union, Any, List, Callable
@@ -12,6 +13,15 @@ from decimal import Decimal
 from urllib.parse import quote
 from flask import current_app, request, flash
 from gevent import spawn
+
+
+def ensure_utc(dt_value):
+    """Ensure a datetime is timezone-aware (UTC). Handles legacy naive datetimes."""
+    if dt_value is None:
+        return None
+    if dt_value.tzinfo is None:
+        return dt_value.replace(tzinfo=timezone.utc)
+    return dt_value
 
 
 def send_email_async(to_email: str, subject: str, html_content: str,
@@ -120,7 +130,6 @@ def update_known_email(email: str, name: str) -> None:
         return
         
     from app.models import KnownEmail, db
-    from datetime import datetime, timezone
     
     known_email = KnownEmail.query.filter_by(email=email).first()
     if known_email:
@@ -1486,7 +1495,6 @@ def generate_history_text(group) -> str:
     Returns:
         str: Formatted text content for download
     """
-    from datetime import datetime
     from app.models import AuditLog
     
     lines = []
@@ -1495,7 +1503,7 @@ def generate_history_text(group) -> str:
     lines.append("=" * 60)
     lines.append(f"EXPENSE HISTORY: {group.name}")
     lines.append("=" * 60)
-    lines.append(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"Generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
     lines.append(f"Group created: {group.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"Default currency: {group.currency}")
     

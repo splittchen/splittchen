@@ -96,13 +96,8 @@ def stop_scheduler():
         logger.info("Background scheduler stopped")
 
 
-def _ensure_utc(dt_value):
-    """Ensure a datetime is timezone-aware (UTC). Handles legacy naive datetimes."""
-    if dt_value is None:
-        return None
-    if dt_value.tzinfo is None:
-        return dt_value.replace(tzinfo=timezone.utc)
-    return dt_value
+# Import shared helper
+from app.utils import ensure_utc as _ensure_utc
 
 
 def check_and_process_settlements():
@@ -532,7 +527,7 @@ def update_next_settlement_date(group: Group):
     """Update the next settlement date for a recurring group.
     
     Uses the current settlement date as reference to calculate next month's
-    last day. Always stores UTC-aware datetime at 22:00 UTC.
+    last day. Always stores UTC-aware datetime at 20:00 UTC.
     """
     import calendar
 
