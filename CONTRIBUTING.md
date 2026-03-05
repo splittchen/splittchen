@@ -34,7 +34,6 @@ We follow the **Google Python Style Guide** with these specifics:
 
 - All public functions must have docstrings
 - Use type hints consistently
-- Update CLAUDE.md for significant architectural changes
 - Keep README.md updated for user-facing changes
 
 ### Testing
@@ -175,9 +174,10 @@ splittchen/
 │   ├── utils.py           # Utility functions
 │   ├── scheduler.py       # Background task scheduler
 │   ├── currency.py        # Currency conversion service
+│   ├── socketio_events/   # WebSocket event handlers
 │   └── templates/         # Jinja2 templates
-├── instance/              # Instance-specific files (created by Docker)
 ├── app.py                 # Application entry point
+├── wsgi.py                # Production WSGI entry point
 ├── requirements.txt       # Python dependencies
 ├── docker-compose.yml     # Multi-service deployment
 ├── Dockerfile            # Container definition

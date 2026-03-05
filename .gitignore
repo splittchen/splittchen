@@ -201,10 +201,14 @@ certs/
 .DS_Store
 Thumbs.db
 
-# Platform-specific deployment files (if they exist)
+# Private development files (not for public repo)
+docker-compose.local.yml
 docker-compose_local.yml
 create-signed-commit.ps1
 init-local-repo.ps1
+LOCAL_DEV.md
+MULTIARCH.md
+MULTIARCH-QUICKREF.md
 .docker-config
 .serena/
 .vscode/
