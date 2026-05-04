@@ -38,7 +38,7 @@ jobs:
           platforms: all
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           platforms: linux/amd64,linux/arm64
         timeout-minutes: 10
@@ -53,7 +53,7 @@ jobs:
 
       - name: Set up Docker Buildx (Retry)
         if: steps.buildx-setup.outcome == 'failure'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           platforms: linux/amd64,linux/arm64
         timeout-minutes: 10
@@ -89,7 +89,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{ steps.platforms.outputs.platforms }}
