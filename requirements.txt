@@ -18,7 +18,7 @@ python-dotenv>=1.2.2,<2.0.0
 gunicorn>=25.3.0,<26.0.0
 
 # PostgreSQL adapter
-psycopg2-binary>=2.9.9,<3.0.0
+psycopg2-binary>=2.9.12,<3.0.0
 
 # Background task scheduling
 APScheduler>=3.11.0,<4.0.0
